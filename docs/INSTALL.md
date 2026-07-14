@@ -5,7 +5,7 @@
 Install Rust from `https://rustup.rs`, make sure Git is installed, then run:
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/Chintanpatel24/orion/main/scripts/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/orion-ide/orion/main/scripts/install.ps1 | iex
 ```
 
 Local source install:
@@ -27,7 +27,7 @@ It also tries to add Orion to the user PATH and create a Start Menu shortcut.
 Install Rust from `https://rustup.rs`, make sure Git is installed, then run:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Chintanpatel24/orion/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/orion-ide/orion/main/scripts/install.sh | sh
 ```
 
 Local source install:
@@ -53,7 +53,7 @@ $HOME/.local/share/applications/orion.desktop
 Install Rust from `https://rustup.rs`, make sure Git is installed, then run:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Chintanpatel24/orion/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/orion-ide/orion/main/scripts/install.sh | sh
 ```
 
 Local source install:
@@ -81,12 +81,12 @@ If you fork or publish Orion under another GitHub account, use:
 Linux and macOS:
 
 ```sh
-export ORION_REPO_URL=https://github.com/Chintanpatel24/orion.git
-curl -fsSL https://raw.githubusercontent.com/yChintanpatel24/orion/main/scripts/install.sh | sh
+export ORION_REPO_URL=https://github.com/your-name/orion.git
+curl -fsSL https://raw.githubusercontent.com/your-name/orion/main/scripts/install.sh | sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-$env:ORION_REPO_URL="https://github.com/Chintanpatel24/orion.git"; iwr -useb https://raw.githubusercontent.com/Chintanpatel24/orion/main/scripts/install.ps1 | iex
+$env:ORION_REPO_URL="https://github.com/your-name/orion.git"; iwr -useb https://raw.githubusercontent.com/your-name/orion/main/scripts/install.ps1 | iex
 ```
