@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Orion IDE
+GenericName=Code Editor
+Comment=Fast lightweight IDE for low-level languages
+Exec=orion %F
+Icon=dev.orion.Orion
+Terminal=false
+Categories=Development;IDE;TextEditor;
+Keywords=IDE;Editor;C;C++;Rust;Zig;Assembly;
+MimeType=text/plain;text/x-c;text/x-c++src;text/x-c++hdr;text/x-rust;text/x-asm;
+StartupNotify=true
