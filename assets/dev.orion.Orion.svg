@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Orion IDE icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="256" y2="256">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <linearGradient id="ringA" x1="40" y1="80" x2="216" y2="176">
+      <stop offset="0" stop-color="#e2e8f0"/>
+      <stop offset="0.5" stop-color="#94a3b8"/>
+      <stop offset="1" stop-color="#64748b"/>
+    </linearGradient>
+
+    <linearGradient id="ringB" x1="216" y1="80" x2="40" y2="176">
+      <stop offset="0" stop-color="#cbd5e1"/>
+      <stop offset="0.5" stop-color="#7c8aa0"/>
+      <stop offset="1" stop-color="#475569"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <ellipse cx="128" cy="128" rx="80" ry="34" fill="none" stroke="url(#ringA)" stroke-width="10" transform="rotate(-30 128 128)"/>
+  <ellipse cx="128" cy="128" rx="80" ry="34" fill="none" stroke="url(#ringB)" stroke-width="10" transform="rotate(35 128 128)"/>
+</svg>

@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="Orion IDE Git Review preview">
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8fb3ff"/>
+      <stop offset="0.55" stop-color="#55e0d4"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="720" rx="28" fill="#070b12"/>
+  <rect x="24" y="24" width="1152" height="672" rx="22" fill="#0d1117" stroke="#1f2937"/>
+
+  <rect x="24" y="24" width="1152" height="52" rx="22" fill="#111827"/>
+  <rect x="49" y="44" width="14" height="12" rx="4" fill="#ef4444"/>
+  <rect x="71" y="44" width="14" height="12" rx="4" fill="#f59e0b"/>
+  <rect x="93" y="44" width="14" height="12" rx="4" fill="#10b981"/>
+  <path d="M146 38C153 38 158 43 158 50C158 57 153 62 146 62C139 62 134 57 134 50C134 43 139 38 146 38Z" fill="none" stroke="url(#accent)" stroke-width="4"/>
+  <ellipse cx="146" cy="50" rx="18" ry="6" fill="none" stroke="#8fb3ff" stroke-width="2" transform="rotate(-24 146 50)"/>
+  <text x="170" y="57" font-family="Inter, Segoe UI, Arial" font-size="18" font-weight="800" fill="#e5edf8">Orion</text>
+  <text x="245" y="57" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#8ea0b8">IDE not for you, but for your agents</text>
+  <text x="1035" y="57" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#8ea0b8">git: main</text>
+
+  <rect x="24" y="76" width="250" height="588" fill="#0b1220"/>
+  <text x="48" y="116" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="800" fill="#93a4bc">PROJECT</text>
+  <text x="48" y="154" font-family="JetBrains Mono, Consolas, monospace" font-size="15" fill="#d1d5db">src</text>
+  <text x="68" y="186" font-family="JetBrains Mono, Consolas, monospace" font-size="15" fill="#8fb3ff">agent.c</text>
+  <text x="68" y="218" font-family="JetBrains Mono, Consolas, monospace" font-size="15" fill="#d1d5db">memory.rs</text>
+  <text x="48" y="250" font-family="JetBrains Mono, Consolas, monospace" font-size="15" fill="#d1d5db">include</text>
+  <text x="68" y="282" font-family="JetBrains Mono, Consolas, monospace" font-size="15" fill="#d1d5db">orion.h</text>
+
+  <rect x="274" y="76" width="902" height="588" fill="#0d1117"/>
+  <text x="302" y="116" font-family="Inter, Segoe UI, Arial" font-size="24" font-weight="800" fill="#e5edf8">Agent Git Review</text>
+  <rect x="1050" y="92" width="82" height="30" rx="8" fill="#1b2535" stroke="#334155"/>
+  <text x="1071" y="113" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#dbeafe">Refresh</text>
+  <text x="302" y="148" font-family="Inter, Segoe UI, Arial" font-size="14" fill="#93a4bc">Side-by-side diffs for agent-reviewed changes. Mark files Done to hide them until they change again.</text>
+
+  <rect x="302" y="178" width="270" height="420" rx="14" fill="#0b1220" stroke="#1f2937"/>
+  <text x="326" y="214" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="800" fill="#93a4bc">CHANGED FILES</text>
+  <rect x="322" y="236" width="226" height="40" rx="10" fill="#172033" stroke="#334155"/>
+  <text x="338" y="261" font-family="JetBrains Mono, Consolas, monospace" font-size="14" fill="#55e0d4">M</text>
+  <text x="366" y="261" font-family="JetBrains Mono, Consolas, monospace" font-size="14" fill="#e5edf8">src/agent.c</text>
+  <text x="338" y="312" font-family="JetBrains Mono, Consolas, monospace" font-size="14" fill="#fbbf24">A</text>
+  <text x="366" y="312" font-family="JetBrains Mono, Consolas, monospace" font-size="14" fill="#d1d5db">src/memory.rs</text>
+  <text x="338" y="356" font-family="JetBrains Mono, Consolas, monospace" font-size="14" fill="#a78bfa">M</text>
+  <text x="366" y="356" font-family="JetBrains Mono, Consolas, monospace" font-size="14" fill="#8ea0b8">include/orion.h done</text>
+  <rect x="326" y="420" width="92" height="32" rx="8" fill="#162033" stroke="#334155"/>
+  <text x="352" y="441" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#dbeafe">Stage</text>
+  <rect x="428" y="420" width="94" height="32" rx="8" fill="#162033" stroke="#334155"/>
+  <text x="447" y="441" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#dbeafe">Unstage</text>
+  <rect x="326" y="464" width="196" height="36" rx="10" fill="url(#accent)"/>
+  <text x="405" y="488" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="800" fill="#07111f">Done</text>
+
+  <rect x="594" y="178" width="548" height="420" rx="14" fill="#0b1220" stroke="#1f2937"/>
+  <text x="620" y="214" font-family="Inter, Segoe UI, Arial" font-size="15" font-weight="800" fill="#e5edf8">src/agent.c</text>
+  <text x="1054" y="214" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#55e0d4">unstaged</text>
+  <line x1="868" y1="236" x2="868" y2="566" stroke="#1f2937"/>
+  <text x="620" y="258" font-family="Inter, Segoe UI, Arial" font-size="13" font-weight="800" fill="#8ea0b8">BEFORE</text>
+  <text x="894" y="258" font-family="Inter, Segoe UI, Arial" font-size="13" font-weight="800" fill="#8ea0b8">AFTER</text>
+
+  <g font-family="JetBrains Mono, Consolas, monospace" font-size="14">
+    <rect x="612" y="276" width="248" height="28" fill="#102016"/>
+    <rect x="876" y="276" width="248" height="28" fill="#102016"/>
+    <text x="624" y="295" fill="#4b5563">42</text><text x="660" y="295" fill="#d1d5db">agent_run(ctx);</text>
+    <text x="888" y="295" fill="#4b5563">42</text><text x="924" y="295" fill="#d1d5db">agent_run(ctx);</text>
+
+    <rect x="612" y="310" width="248" height="28" fill="#4a2226"/>
+    <text x="624" y="329" fill="#4b5563">43</text><text x="660" y="329" fill="#fecaca">return status;</text>
+
+    <rect x="876" y="310" width="248" height="28" fill="#143a2b"/>
+    <text x="888" y="329" fill="#4b5563">43</text><text x="924" y="329" fill="#bbf7d0">memory_save(ctx);</text>
+
+    <rect x="876" y="344" width="248" height="28" fill="#143a2b"/>
+    <text x="888" y="363" fill="#4b5563">44</text><text x="924" y="363" fill="#bbf7d0">return status;</text>
+
+    <rect x="612" y="390" width="248" height="28" fill="#102016"/>
+    <rect x="876" y="390" width="248" height="28" fill="#102016"/>
+    <text x="624" y="409" fill="#4b5563">44</text><text x="660" y="409" fill="#d1d5db">}</text>
+    <text x="888" y="409" fill="#4b5563">45</text><text x="924" y="409" fill="#d1d5db">}</text>
+  </g>
+
+  <rect x="24" y="664" width="1152" height="32" fill="#111827"/>
+  <text x="48" y="686" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#93a4bc">Workspace remembered: /projects/orion-agent</text>
+  <text x="1042" y="686" font-family="Inter, Segoe UI, Arial" font-size="13" fill="#93a4bc">changes: 3</text>
+</svg>
