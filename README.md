@@ -2,7 +2,7 @@
 
 ![Orion IDE logo](assets/orion-logo.svg)
 
-Orion is a fast, lightweight, secure native desktop IDE for low-level languages and agent-driven code review.
+- Orion is a fast, lightweight, secure native desktop IDE for low-level languages and agent-driven code review.
 
 Tagline:
 
@@ -10,13 +10,11 @@ Tagline:
 IDE not for you, but for your agents.
 ```
 
-Orion is designed for people who want a clean desktop app like modern IDEs, but without Electron, Chromium, a webview runtime, telemetry, heavy background services, or a built-in code runner output window. The main workflow is editing plus Git review, so agents and users can inspect changes quickly, mark files done, and keep moving.
-
-![Orion IDE interface preview](assets/orion-preview.svg)
+- Orion is designed for people who want a clean desktop app like modern IDEs, but without Electron, Chromium, a webview runtime, telemetry, heavy background services, or a built-in code runner output window. The main workflow is editing plus Git review, so agents and users can inspect changes quickly, mark files done, and keep moving.
 
 ## Status
 
-Orion is a GitHub-ready repository with source code, assets, installers, packaging templates, CI workflows, documentation, security notes, and contribution files.
+- Orion is a GitHub-ready repository with source code, assets, installers, packaging templates, CI workflows, documentation, security notes, and contribution files.
 
 ## Design goals
 
@@ -59,7 +57,7 @@ Orion is a GitHub-ready repository with source code, assets, installers, packagi
 
 ## Agent Git Review
 
-Orion replaces the usual run-output focused IDE workflow with an agent review workflow.
+- Orion replaces the usual run-output focused IDE workflow with an agent review workflow.
 
 Open Git Review with:
 
