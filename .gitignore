@@ -1,0 +1,10 @@
+/target/
+/release/
+/orion
+/orion.exe
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+.idea/
+.cache/
