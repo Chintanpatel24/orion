@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.orion.Orion</id>
+  <name>Orion IDE</name>
+  <summary>Fast lightweight IDE for low-level languages</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>Orion is a native desktop IDE focused on low-level languages and agent-driven Git review. It avoids heavy web runtimes and background services while providing a file explorer, tabs, syntax highlighting, side-by-side diffs, Done review markers, settings, and a command palette.</p>
+  </description>
+  <categories>
+    <category>Development</category>
+    <category>IDE</category>
+    <category>TextEditor</category>
+  </categories>
+  <launchable type="desktop-id">dev.orion.Orion.desktop</launchable>
+  <releases>
+    <release version="0.2.0" date="2026-07-14" />
+  </releases>
+</component>
