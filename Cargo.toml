@@ -17,7 +17,7 @@ eframe = { version = "0.35", default-features = false, features = ["default_font
 serde = { version = "1.0", features = ["derive"] }
 toml = "1.1"
 directories = "5.0"
-rfd = { version = "0.15", optional = true }
+rfd = { version = "0.17", optional = true }
 
 [features]
 default = ["native-dialogs"]
