@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$RepoUrl = if ($env:ORION_REPO_URL) { $env:ORION_REPO_URL } else { "https://github.com/orion-ide/orion.git" }
+$RepoUrl = if ($env:ORION_REPO_URL) { $env:ORION_REPO_URL } else { "https://github.com/Chintanpatel24/orion.git" }
 $Profile = if ($env:ORION_PROFILE) { $env:ORION_PROFILE } else { "release" }
 $InstallDir = if ($env:ORION_INSTALL_DIR) { $env:ORION_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "Orion" }
 $CacheDir = Join-Path $env:TEMP "orion-src"
