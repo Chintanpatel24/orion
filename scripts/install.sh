@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-REPO_URL=${ORION_REPO_URL:-https://github.com/orion-ide/orion.git}
+REPO_URL=${ORION_REPO_URL:-https://github.com/Chintanpatel24/orion.git}
 PREFIX=${PREFIX:-$HOME/.local}
 BINDIR=${BINDIR:-$PREFIX/bin}
 PROFILE=${ORION_PROFILE:-release}
