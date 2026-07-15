@@ -134,12 +134,20 @@ impl Settings {
         }
         ctx.set_visuals(visuals);
 
-        let mut style = (*ctx.style()).clone();
-        style.spacing.item_spacing = egui::vec2(8.0, 6.0);
-        style.spacing.button_padding = egui::vec2(12.0, 6.0);
-        style.text_styles.insert(egui::TextStyle::Monospace, egui::FontId::monospace(self.font_size));
-        style.text_styles.insert(egui::TextStyle::Body, egui::FontId::proportional(self.font_size));
-        style.text_styles.insert(egui::TextStyle::Button, egui::FontId::proportional(self.font_size));
-        ctx.set_style(style);
+        let themes = match self.theme {
+            ThemeMode::System => vec![egui::Theme::Light, egui::Theme::Dark],
+            ThemeMode::Light => vec![egui::Theme::Light],
+            ThemeMode::Dark => vec![egui::Theme::Dark],
+        };
+
+        for theme in themes {
+            let mut style = (*ctx.style_of(theme)).clone();
+            style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+            style.spacing.button_padding = egui::vec2(12.0, 6.0);
+            style.text_styles.insert(egui::TextStyle::Monospace, egui::FontId::monospace(self.font_size));
+            style.text_styles.insert(egui::TextStyle::Body, egui::FontId::proportional(self.font_size));
+            style.text_styles.insert(egui::TextStyle::Button, egui::FontId::proportional(self.font_size));
+            ctx.set_style_of(theme, style);
+        }
     }
 }

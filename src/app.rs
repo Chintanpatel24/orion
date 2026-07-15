@@ -488,8 +488,9 @@ impl OrionApp {
         false
     }
 
-    fn show_top_bar(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
+    fn show_top_bar(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        egui::Panel::top("top_bar").show(ui, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 draw_orion_mark(ui);
@@ -520,37 +521,37 @@ impl OrionApp {
             });
             ui.add_space(4.0);
             ui.separator();
-            egui::menu::bar(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("New file    Ctrl-N").clicked() {
                         self.new_document();
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Open file    Ctrl-O").clicked() {
                         self.pick_and_open_file();
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Open folder    Ctrl-Shift-O").clicked() {
                         self.pick_and_open_workspace();
-                        ui.close_menu();
+                        ui.close();
                     }
                     ui.separator();
                     if ui.button("Save    Ctrl-S").clicked() {
                         self.save_current();
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Save as    Ctrl-Shift-S").clicked() {
                         self.save_current_as();
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Save all").clicked() {
                         self.save_all();
-                        ui.close_menu();
+                        ui.close();
                     }
                     ui.separator();
                     if ui.button("Quit    Ctrl-Q").clicked() {
-                        self.request_quit(ctx);
-                        ui.close_menu();
+                        self.request_quit(&ctx);
+                        ui.close();
                     }
                 });
 
@@ -558,53 +559,53 @@ impl OrionApp {
                     if ui.button("Review changes    Ctrl-G").clicked() {
                         self.show_git_review = true;
                         self.refresh_git();
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Refresh Git").clicked() {
                         self.refresh_git();
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Stage selected").clicked() {
                         self.stage_selected();
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Unstage selected").clicked() {
                         self.unstage_selected();
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Mark selected done").clicked() {
                         self.mark_selected_done();
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
                 ui.menu_button("View", |ui| {
                     if ui.button("Editor").clicked() {
                         self.show_git_review = false;
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Command palette    Ctrl-P").clicked() {
                         self.show_palette = true;
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Search    Ctrl-F").clicked() {
                         self.show_search = true;
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Settings").clicked() {
                         self.show_settings = true;
-                        ui.close_menu();
+                        ui.close();
                     }
                     if ui.button("Refresh workspace").clicked() {
                         let _ = self.workspace.refresh(self.settings.show_hidden_files);
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
                 ui.menu_button("Help", |ui| {
                     if ui.button("Shortcuts").clicked() {
                         self.show_help = true;
-                        ui.close_menu();
+                        ui.close();
                     }
                 });
 
@@ -618,11 +619,11 @@ impl OrionApp {
         });
     }
 
-    fn show_workspace_panel(&mut self, ctx: &egui::Context) {
-        egui::SidePanel::left("workspace_panel")
+    fn show_workspace_panel(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::left("workspace_panel")
             .resizable(true)
-            .default_width(286.0)
-            .show(ctx, |ui| {
+            .default_size(286.0)
+            .show(ui, |ui| {
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
                     ui.heading("Project");
@@ -680,16 +681,16 @@ impl OrionApp {
             });
     }
 
-    fn show_main_area(&mut self, ctx: &egui::Context) {
+    fn show_main_area(&mut self, ui: &mut egui::Ui) {
         if self.show_git_review {
-            self.show_git_review_panel(ctx);
+            self.show_git_review_panel(ui);
         } else {
-            self.show_editor(ctx);
+            self.show_editor(ui);
         }
     }
 
-    fn show_editor(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+    fn show_editor(&mut self, ui: &mut egui::Ui) {
+        egui::CentralPanel::default().show(ui, |ui| {
             self.show_tabs(ui);
             ui.separator();
 
@@ -711,7 +712,7 @@ impl OrionApp {
 
             let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, wrap_width: f32| {
                 let job = syntax::highlighted_job(ui, text.as_str(), language, wrap_width, font_size);
-                ui.fonts(|fonts| fonts.layout_job(job))
+                ui.fonts_mut(|fonts| fonts.layout_job(job))
             };
 
             let response = ui.add(
@@ -751,8 +752,8 @@ impl OrionApp {
         }
     }
 
-    fn show_git_review_panel(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+    fn show_git_review_panel(&mut self, ui: &mut egui::Ui) {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
@@ -914,8 +915,8 @@ impl OrionApp {
         self.git_files.iter().find(|file| &file.path == path).cloned()
     }
 
-    fn show_status_bar(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::bottom("status_bar").exact_height(28.0).show(ctx, |ui| {
+    fn show_status_bar(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::bottom("status_bar").exact_size(28.0).show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(&self.status);
                 ui.separator();
@@ -961,13 +962,16 @@ impl OrionApp {
 
                 ui.separator();
                 egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
+                    let mut clicked_action = None;
                     for item in command::palette_items().iter().filter(|item| command::matches_query(item, &self.palette_query)) {
                         if ui.selectable_label(false, item.name).on_hover_text(item.detail).clicked() {
-                            let action = item.action;
-                            self.execute_palette_action(action);
-                            self.palette_query.clear();
-                            self.show_palette = false;
+                            clicked_action = Some(item.action);
                         }
+                    }
+                    if let Some(action) = clicked_action {
+                        self.execute_palette_action(action);
+                        self.palette_query.clear();
+                        self.show_palette = false;
                     }
                 });
             });
@@ -1134,17 +1138,18 @@ impl OrionApp {
 }
 
 impl eframe::App for OrionApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.handle_shortcuts(ctx);
-        self.show_top_bar(ctx);
-        self.show_status_bar(ctx);
-        self.show_workspace_panel(ctx);
-        self.show_main_area(ctx);
-        self.show_palette_window(ctx);
-        self.show_search_window(ctx);
-        self.show_settings_window(ctx);
-        self.show_help_window(ctx);
-        self.show_confirm_close_window(ctx);
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
+        self.handle_shortcuts(&ctx);
+        self.show_top_bar(ui);
+        self.show_status_bar(ui);
+        self.show_workspace_panel(ui);
+        self.show_main_area(ui);
+        self.show_palette_window(&ctx);
+        self.show_search_window(&ctx);
+        self.show_settings_window(&ctx);
+        self.show_help_window(&ctx);
+        self.show_confirm_close_window(&ctx);
     }
 }
 
