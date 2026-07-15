@@ -24,9 +24,5 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
 
-    eframe::run_native(
-        "Orion IDE",
-        native_options,
-        Box::new(|cc| Ok(Box::new(OrionApp::new(cc)))),
-    )
+    eframe::run_native("Orion IDE", native_options, Box::new(|cc| Ok(Box::new(OrionApp::new(cc)))))
 }

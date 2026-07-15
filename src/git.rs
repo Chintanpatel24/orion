@@ -73,12 +73,7 @@ pub fn changed_files(root: &Path) -> Result<Vec<GitFile>, String> {
         }
         let staged = xy.as_bytes().first().is_some_and(|status| *status != b' ' && *status != b'?');
         let fingerprint = change_fingerprint(root, &path, &xy);
-        files.push(GitFile {
-            path,
-            status: xy.trim().to_string(),
-            staged,
-            fingerprint,
-        });
+        files.push(GitFile { path, status: xy.trim().to_string(), staged, fingerprint });
     }
 
     files.sort_by(|a, b| a.path.to_ascii_lowercase().cmp(&b.path.to_ascii_lowercase()));
@@ -231,7 +226,11 @@ fn parse_unified_diff(diff: &str) -> Vec<DiffRow> {
     let mut new_line = 0usize;
 
     for line in diff.lines() {
-        if line.starts_with("diff --git") || line.starts_with("index ") || line.starts_with("--- ") || line.starts_with("+++ ") {
+        if line.starts_with("diff --git")
+            || line.starts_with("index ")
+            || line.starts_with("--- ")
+            || line.starts_with("+++ ")
+        {
             rows.push(DiffRow {
                 old_line: None,
                 new_line: None,
