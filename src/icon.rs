@@ -51,13 +51,10 @@ pub fn app_icon() -> egui::IconData {
         }
     }
 
-    egui::IconData {
-        rgba,
-        width: SIZE as u32,
-        height: SIZE as u32,
-    }
+    egui::IconData { rgba, width: SIZE as u32, height: SIZE as u32 }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn rotated_ellipse_stroke_alpha(
     x: f32,
     y: f32,
@@ -100,11 +97,7 @@ fn rounded_rect_alpha(x: f32, y: f32, left: f32, top: f32, right: f32, bottom: f
 }
 
 fn mix(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
-    [
-        a[0] + (b[0] - a[0]) * t,
-        a[1] + (b[1] - a[1]) * t,
-        a[2] + (b[2] - a[2]) * t,
-    ]
+    [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
 }
 
 fn put(rgba: &mut [u8], x: usize, y: usize, color: [f32; 4]) {

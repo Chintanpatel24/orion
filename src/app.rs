@@ -301,9 +301,7 @@ impl OrionApp {
     }
 
     fn is_git_file_done(&self, file: &GitFile) -> bool {
-        self.git_repo
-            .as_ref()
-            .is_some_and(|repo| self.settings.is_reviewed(repo, &file.path, &file.fingerprint))
+        self.git_repo.as_ref().is_some_and(|repo| self.settings.is_reviewed(repo, &file.path, &file.fingerprint))
     }
 
     fn mark_selected_done(&mut self) {
@@ -495,7 +493,9 @@ impl OrionApp {
             ui.horizontal(|ui| {
                 draw_orion_mark(ui);
                 ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("Orion").size(20.0).strong().color(egui::Color32::from_rgb(226, 237, 248)));
+                    ui.label(
+                        egui::RichText::new("Orion").size(20.0).strong().color(egui::Color32::from_rgb(226, 237, 248)),
+                    );
                     ui.label(
                         egui::RichText::new("IDE not for you, but for your agents")
                             .size(12.0)
@@ -505,7 +505,10 @@ impl OrionApp {
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .add(egui::Button::new(egui::RichText::new("Git Review").strong()).fill(egui::Color32::from_rgb(36, 51, 82)))
+                        .add(
+                            egui::Button::new(egui::RichText::new("Git Review").strong())
+                                .fill(egui::Color32::from_rgb(36, 51, 82)),
+                        )
                         .clicked()
                     {
                         self.show_git_review = true;
@@ -611,74 +614,86 @@ impl OrionApp {
 
                 ui.separator();
                 if !self.git_branch.is_empty() {
-                    ui.label(egui::RichText::new(format!("git: {}", self.git_branch)).color(egui::Color32::from_rgb(85, 224, 212)));
+                    ui.label(
+                        egui::RichText::new(format!("git: {}", self.git_branch))
+                            .color(egui::Color32::from_rgb(85, 224, 212)),
+                    );
                     ui.separator();
                 }
-                ui.label(egui::RichText::new(format!("changes: {}", self.git_files.len())).color(egui::Color32::from_rgb(142, 160, 184)));
+                ui.label(
+                    egui::RichText::new(format!("changes: {}", self.git_files.len()))
+                        .color(egui::Color32::from_rgb(142, 160, 184)),
+                );
             });
         });
     }
 
     fn show_workspace_panel(&mut self, ui: &mut egui::Ui) {
-        egui::Panel::left("workspace_panel")
-            .resizable(true)
-            .default_size(286.0)
-            .show(ui, |ui| {
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    ui.heading("Project");
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.small_button("Refresh").clicked() {
-                            match self.workspace.refresh(self.settings.show_hidden_files) {
-                                Ok(()) => self.status = "Workspace refreshed".to_string(),
-                                Err(err) => self.status = err,
-                            }
+        egui::Panel::left("workspace_panel").resizable(true).default_size(286.0).show(ui, |ui| {
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.heading("Project");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.small_button("Refresh").clicked() {
+                        match self.workspace.refresh(self.settings.show_hidden_files) {
+                            Ok(()) => self.status = "Workspace refreshed".to_string(),
+                            Err(err) => self.status = err,
                         }
-                    });
-                });
-                ui.add_space(4.0);
-
-                if let Some(root) = &self.workspace.root {
-                    ui.group(|ui| {
-                        ui.label(egui::RichText::new("Remembered project").small().color(egui::Color32::from_rgb(142, 160, 184)));
-                        ui.label(egui::RichText::new(root.display().to_string()).monospace().color(egui::Color32::from_rgb(226, 237, 248)));
-                        if !self.git_branch.is_empty() {
-                            ui.label(egui::RichText::new(format!("branch: {}", self.git_branch)).color(egui::Color32::from_rgb(85, 224, 212)));
-                        }
-                    });
-                    ui.add_space(8.0);
-
-                    let mut open_path = None;
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        for entry in &self.workspace.entries {
-                            ui.horizontal(|ui| {
-                                ui.add_space((entry.depth * 14) as f32);
-                                let label = if entry.is_dir { format!("{}/", entry.name) } else { entry.name.clone() };
-                                let text = if entry.is_dir {
-                                    egui::RichText::new(label).color(egui::Color32::from_rgb(142, 160, 184))
-                                } else {
-                                    egui::RichText::new(label).color(egui::Color32::from_rgb(216, 222, 233))
-                                };
-                                let response = ui.selectable_label(false, text);
-                                if response.clicked() && !entry.is_dir {
-                                    open_path = Some(entry.path.clone());
-                                }
-                            });
-                        }
-                    });
-                    if let Some(path) = open_path {
-                        self.open_document(path);
                     }
-                } else {
-                    ui.group(|ui| {
-                        ui.label(egui::RichText::new("No project folder open").strong());
-                        ui.label("Orion remembers the last folder until you choose another one.");
-                        if ui.button("Open folder").clicked() {
-                            self.pick_and_open_workspace();
-                        }
-                    });
-                }
+                });
             });
+            ui.add_space(4.0);
+
+            if let Some(root) = &self.workspace.root {
+                ui.group(|ui| {
+                    ui.label(
+                        egui::RichText::new("Remembered project").small().color(egui::Color32::from_rgb(142, 160, 184)),
+                    );
+                    ui.label(
+                        egui::RichText::new(root.display().to_string())
+                            .monospace()
+                            .color(egui::Color32::from_rgb(226, 237, 248)),
+                    );
+                    if !self.git_branch.is_empty() {
+                        ui.label(
+                            egui::RichText::new(format!("branch: {}", self.git_branch))
+                                .color(egui::Color32::from_rgb(85, 224, 212)),
+                        );
+                    }
+                });
+                ui.add_space(8.0);
+
+                let mut open_path = None;
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    for entry in &self.workspace.entries {
+                        ui.horizontal(|ui| {
+                            ui.add_space((entry.depth * 14) as f32);
+                            let label = if entry.is_dir { format!("{}/", entry.name) } else { entry.name.clone() };
+                            let text = if entry.is_dir {
+                                egui::RichText::new(label).color(egui::Color32::from_rgb(142, 160, 184))
+                            } else {
+                                egui::RichText::new(label).color(egui::Color32::from_rgb(216, 222, 233))
+                            };
+                            let response = ui.selectable_label(false, text);
+                            if response.clicked() && !entry.is_dir {
+                                open_path = Some(entry.path.clone());
+                            }
+                        });
+                    }
+                });
+                if let Some(path) = open_path {
+                    self.open_document(path);
+                }
+            } else {
+                ui.group(|ui| {
+                    ui.label(egui::RichText::new("No project folder open").strong());
+                    ui.label("Orion remembers the last folder until you choose another one.");
+                    if ui.button("Open folder").clicked() {
+                        self.pick_and_open_workspace();
+                    }
+                });
+            }
+        });
     }
 
     fn show_main_area(&mut self, ui: &mut egui::Ui) {
@@ -699,7 +714,10 @@ impl OrionApp {
                 return;
             };
             let highlight_limit = self.settings.highlight_limit_mb.saturating_mul(1024).saturating_mul(1024) as usize;
-            let language = if self.settings.syntax_highlighting && !self.settings.low_power_mode && doc.byte_count() <= highlight_limit {
+            let language = if self.settings.syntax_highlighting
+                && !self.settings.low_power_mode
+                && doc.byte_count() <= highlight_limit
+            {
                 doc.language
             } else {
                 syntax::Language::Plain
@@ -757,10 +775,17 @@ impl OrionApp {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("Agent Git Review").size(24.0).strong().color(egui::Color32::from_rgb(226, 237, 248)));
                     ui.label(
-                        egui::RichText::new("Review changes side by side, then mark files Done until they change again.")
-                            .color(egui::Color32::from_rgb(142, 160, 184)),
+                        egui::RichText::new("Agent Git Review")
+                            .size(24.0)
+                            .strong()
+                            .color(egui::Color32::from_rgb(226, 237, 248)),
+                    );
+                    ui.label(
+                        egui::RichText::new(
+                            "Review changes side by side, then mark files Done until they change again.",
+                        )
+                        .color(egui::Color32::from_rgb(142, 160, 184)),
                     );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -802,7 +827,11 @@ impl OrionApp {
                         ui.horizontal(|ui| {
                             ui.heading("Changed files");
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.label(egui::RichText::new("review queue").small().color(egui::Color32::from_rgb(142, 160, 184)));
+                                ui.label(
+                                    egui::RichText::new("review queue")
+                                        .small()
+                                        .color(egui::Color32::from_rgb(142, 160, 184)),
+                                );
                             });
                         });
 
@@ -834,7 +863,10 @@ impl OrionApp {
                                 } else {
                                     format!("{}  {}", file.status, file.path)
                                 };
-                                let response = ui.selectable_label(selected, egui::RichText::new(label).monospace().color(status_color));
+                                let response = ui.selectable_label(
+                                    selected,
+                                    egui::RichText::new(label).monospace().color(status_color),
+                                );
                                 if response.clicked() {
                                     self.selected_git_path = Some(file.path.clone());
                                     self.load_selected_diff();
@@ -853,7 +885,10 @@ impl OrionApp {
                         });
                         ui.horizontal(|ui| {
                             if ui
-                                .add(egui::Button::new(egui::RichText::new("Done").strong()).fill(egui::Color32::from_rgb(29, 78, 64)))
+                                .add(
+                                    egui::Button::new(egui::RichText::new("Done").strong())
+                                        .fill(egui::Color32::from_rgb(29, 78, 64)),
+                                )
                                 .clicked()
                             {
                                 self.mark_selected_done();
@@ -879,11 +914,20 @@ impl OrionApp {
                     ui.group(|ui| {
                         let selected = self.selected_git_path.clone().unwrap_or_else(|| "No file selected".to_string());
                         ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new(selected).size(18.0).strong().color(egui::Color32::from_rgb(226, 237, 248)));
+                            ui.label(
+                                egui::RichText::new(selected)
+                                    .size(18.0)
+                                    .strong()
+                                    .color(egui::Color32::from_rgb(226, 237, 248)),
+                            );
                             if let Some(file) = self.selected_git_file() {
                                 let done = self.is_git_file_done(&file);
                                 review_badge(ui, &file.status, egui::Color32::from_rgb(143, 179, 255));
-                                review_badge(ui, if file.staged { "staged" } else { "unstaged" }, egui::Color32::from_rgb(85, 224, 212));
+                                review_badge(
+                                    ui,
+                                    if file.staged { "staged" } else { "unstaged" },
+                                    egui::Color32::from_rgb(85, 224, 212),
+                                );
                                 if done {
                                     review_badge(ui, "done", egui::Color32::from_rgb(167, 139, 250));
                                 }
@@ -893,7 +937,10 @@ impl OrionApp {
                                     self.unmark_selected_done();
                                 }
                                 if ui
-                                    .add(egui::Button::new(egui::RichText::new("Done").strong()).fill(egui::Color32::from_rgb(29, 78, 64)))
+                                    .add(
+                                        egui::Button::new(egui::RichText::new("Done").strong())
+                                            .fill(egui::Color32::from_rgb(29, 78, 64)),
+                                    )
                                     .clicked()
                                 {
                                     self.mark_selected_done();
@@ -949,10 +996,9 @@ impl OrionApp {
             .show(ctx, |ui| {
                 ui.label("Type a command or select an action.");
                 ui.label("Freeform commands: open <path>, folder <path>, git, review.");
-                let enter = ui
-                    .add(egui::TextEdit::singleline(&mut self.palette_query).hint_text("Command"))
-                    .lost_focus()
-                    && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                let enter =
+                    ui.add(egui::TextEdit::singleline(&mut self.palette_query).hint_text("Command")).lost_focus()
+                        && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
                 if enter && self.execute_freeform_palette_command() {
                     self.palette_query.clear();
@@ -963,7 +1009,9 @@ impl OrionApp {
                 ui.separator();
                 egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
                     let mut clicked_action = None;
-                    for item in command::palette_items().iter().filter(|item| command::matches_query(item, &self.palette_query)) {
+                    for item in
+                        command::palette_items().iter().filter(|item| command::matches_query(item, &self.palette_query))
+                    {
                         if ui.selectable_label(false, item.name).on_hover_text(item.detail).clicked() {
                             clicked_action = Some(item.action);
                         }
@@ -984,38 +1032,31 @@ impl OrionApp {
         }
 
         let mut open = self.show_search;
-        egui::Window::new("Search")
-            .open(&mut open)
-            .collapsible(false)
-            .default_width(420.0)
-            .show(ctx, |ui| {
-                ui.label("Find text in the current file.");
-                ui.text_edit_singleline(&mut self.search_query);
-                ui.horizontal(|ui| {
-                    ui.label("Replace with");
-                    ui.text_edit_singleline(&mut self.replace_query);
-                });
-                let count = self
-                    .current_document()
-                    .map(|doc| count_matches(&doc.text, &self.search_query))
-                    .unwrap_or(0);
-                ui.label(format!("Matches: {count}"));
-                ui.horizontal(|ui| {
-                    if ui.button("Replace all").clicked() {
-                        let search = self.search_query.clone();
-                        let replace = self.replace_query.clone();
-                        if !search.is_empty() {
-                            if let Some(doc) = self.current_document_mut() {
-                                doc.text = doc.text.replace(&search, &replace);
-                                doc.dirty = true;
-                            }
+        egui::Window::new("Search").open(&mut open).collapsible(false).default_width(420.0).show(ctx, |ui| {
+            ui.label("Find text in the current file.");
+            ui.text_edit_singleline(&mut self.search_query);
+            ui.horizontal(|ui| {
+                ui.label("Replace with");
+                ui.text_edit_singleline(&mut self.replace_query);
+            });
+            let count = self.current_document().map(|doc| count_matches(&doc.text, &self.search_query)).unwrap_or(0);
+            ui.label(format!("Matches: {count}"));
+            ui.horizontal(|ui| {
+                if ui.button("Replace all").clicked() {
+                    let search = self.search_query.clone();
+                    let replace = self.replace_query.clone();
+                    if !search.is_empty() {
+                        if let Some(doc) = self.current_document_mut() {
+                            doc.text = doc.text.replace(&search, &replace);
+                            doc.dirty = true;
                         }
                     }
-                    if ui.button("Close").clicked() {
-                        self.show_search = false;
-                    }
-                });
+                }
+                if ui.button("Close").clicked() {
+                    self.show_search = false;
+                }
             });
+        });
         self.show_search = open && self.show_search;
     }
 
@@ -1075,20 +1116,17 @@ impl OrionApp {
             return;
         }
         let mut open = self.show_help;
-        egui::Window::new("Shortcuts")
-            .open(&mut open)
-            .default_width(440.0)
-            .show(ctx, |ui| {
-                ui.monospace("Ctrl-N          New file");
-                ui.monospace("Ctrl-O          Open file");
-                ui.monospace("Ctrl-Shift-O    Open project folder");
-                ui.monospace("Ctrl-S          Save");
-                ui.monospace("Ctrl-Shift-S    Save as");
-                ui.monospace("Ctrl-P          Command palette");
-                ui.monospace("Ctrl-F          Search");
-                ui.monospace("Ctrl-G          Agent Git Review");
-                ui.monospace("Ctrl-Q          Quit");
-            });
+        egui::Window::new("Shortcuts").open(&mut open).default_width(440.0).show(ctx, |ui| {
+            ui.monospace("Ctrl-N          New file");
+            ui.monospace("Ctrl-O          Open file");
+            ui.monospace("Ctrl-Shift-O    Open project folder");
+            ui.monospace("Ctrl-S          Save");
+            ui.monospace("Ctrl-Shift-S    Save as");
+            ui.monospace("Ctrl-P          Command palette");
+            ui.monospace("Ctrl-F          Search");
+            ui.monospace("Ctrl-G          Agent Git Review");
+            ui.monospace("Ctrl-Q          Quit");
+        });
         self.show_help = open;
     }
 
@@ -1097,43 +1135,40 @@ impl OrionApp {
             return;
         };
 
-        egui::Window::new("Unsaved changes")
-            .collapsible(false)
-            .resizable(false)
-            .show(ctx, |ui| {
-                ui.label("There are unsaved changes.");
-                ui.horizontal(|ui| {
-                    if ui.button("Save").clicked() {
-                        match request {
-                            CloseRequest::Document(idx) => {
-                                self.current = idx;
-                                self.save_current();
-                                if !self.documents.get(idx).is_some_and(|doc| doc.dirty) {
-                                    self.close_document_now(idx);
-                                    self.pending_close = None;
-                                }
+        egui::Window::new("Unsaved changes").collapsible(false).resizable(false).show(ctx, |ui| {
+            ui.label("There are unsaved changes.");
+            ui.horizontal(|ui| {
+                if ui.button("Save").clicked() {
+                    match request {
+                        CloseRequest::Document(idx) => {
+                            self.current = idx;
+                            self.save_current();
+                            if !self.documents.get(idx).is_some_and(|doc| doc.dirty) {
+                                self.close_document_now(idx);
+                                self.pending_close = None;
                             }
-                            CloseRequest::App => {
-                                self.save_all();
-                                if !self.documents.iter().any(|doc| doc.dirty) {
-                                    self.pending_close = None;
-                                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                                }
+                        }
+                        CloseRequest::App => {
+                            self.save_all();
+                            if !self.documents.iter().any(|doc| doc.dirty) {
+                                self.pending_close = None;
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                             }
                         }
                     }
-                    if ui.button("Discard").clicked() {
-                        match request {
-                            CloseRequest::Document(idx) => self.close_document_now(idx),
-                            CloseRequest::App => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
-                        }
-                        self.pending_close = None;
+                }
+                if ui.button("Discard").clicked() {
+                    match request {
+                        CloseRequest::Document(idx) => self.close_document_now(idx),
+                        CloseRequest::App => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
                     }
-                    if ui.button("Cancel").clicked() {
-                        self.pending_close = None;
-                    }
-                });
+                    self.pending_close = None;
+                }
+                if ui.button("Cancel").clicked() {
+                    self.pending_close = None;
+                }
             });
+        });
     }
 }
 
@@ -1200,36 +1235,22 @@ fn review_badge(ui: &mut egui::Ui, text: &str, color: egui::Color32) {
 }
 
 fn draw_diff_rows(ui: &mut egui::Ui, rows: &[DiffRow]) {
-    egui::Grid::new("agent_diff_grid")
-        .num_columns(4)
-        .spacing([8.0, 3.0])
-        .striped(true)
-        .show(ui, |ui| {
-            ui.strong("Old");
-            ui.strong("Before");
-            ui.strong("New");
-            ui.strong("After");
-            ui.end_row();
+    egui::Grid::new("agent_diff_grid").num_columns(4).spacing([8.0, 3.0]).striped(true).show(ui, |ui| {
+        ui.strong("Old");
+        ui.strong("Before");
+        ui.strong("New");
+        ui.strong("After");
+        ui.end_row();
 
-            for row in rows {
-                let (left_color, right_color, bg) = diff_colors(row.kind);
-                ui.monospace(row.old_line.map(|line| line.to_string()).unwrap_or_default());
-                ui.label(
-                    egui::RichText::new(&row.old_text)
-                        .monospace()
-                        .color(left_color)
-                        .background_color(bg),
-                );
-                ui.monospace(row.new_line.map(|line| line.to_string()).unwrap_or_default());
-                ui.label(
-                    egui::RichText::new(&row.new_text)
-                        .monospace()
-                        .color(right_color)
-                        .background_color(bg),
-                );
-                ui.end_row();
-            }
-        });
+        for row in rows {
+            let (left_color, right_color, bg) = diff_colors(row.kind);
+            ui.monospace(row.old_line.map(|line| line.to_string()).unwrap_or_default());
+            ui.label(egui::RichText::new(&row.old_text).monospace().color(left_color).background_color(bg));
+            ui.monospace(row.new_line.map(|line| line.to_string()).unwrap_or_default());
+            ui.label(egui::RichText::new(&row.new_text).monospace().color(right_color).background_color(bg));
+            ui.end_row();
+        }
+    });
 }
 
 fn diff_colors(kind: DiffKind) -> (egui::Color32, egui::Color32, egui::Color32) {
@@ -1249,11 +1270,9 @@ fn diff_colors(kind: DiffKind) -> (egui::Color32, egui::Color32, egui::Color32) 
             egui::Color32::from_rgb(147, 164, 188),
             egui::Color32::from_rgb(16, 24, 38),
         ),
-        DiffKind::Context => (
-            egui::Color32::from_rgb(216, 222, 233),
-            egui::Color32::from_rgb(216, 222, 233),
-            egui::Color32::TRANSPARENT,
-        ),
+        DiffKind::Context => {
+            (egui::Color32::from_rgb(216, 222, 233), egui::Color32::from_rgb(216, 222, 233), egui::Color32::TRANSPARENT)
+        }
     }
 }
 

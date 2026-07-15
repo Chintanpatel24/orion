@@ -9,11 +9,7 @@ pub fn validate_text_file(path: &Path, max_bytes: u64) -> Result<(), String> {
         return Err(format!("Not a regular file: {}", path.display()));
     }
     if metadata.len() > max_bytes {
-        return Err(format!(
-            "File is too large: {} bytes. Current limit is {} bytes.",
-            metadata.len(),
-            max_bytes
-        ));
+        return Err(format!("File is too large: {} bytes. Current limit is {} bytes.", metadata.len(), max_bytes));
     }
     Ok(())
 }

@@ -32,13 +32,7 @@ impl Document {
         let title = file_title(&path);
         let language = syntax::language_for_path(&path);
 
-        Ok(Self {
-            path: Some(path),
-            title,
-            text,
-            dirty: false,
-            language,
-        })
+        Ok(Self { path: Some(path), title, text, dirty: false, language })
     }
 
     pub fn save(&mut self) -> Result<(), String> {
@@ -83,8 +77,5 @@ impl Document {
 }
 
 fn file_title(path: &Path) -> String {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| path.display().to_string())
+    path.file_name().and_then(|name| name.to_str()).map(ToOwned::to_owned).unwrap_or_else(|| path.display().to_string())
 }

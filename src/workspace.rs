@@ -20,12 +20,7 @@ pub struct Workspace {
 
 impl Default for Workspace {
     fn default() -> Self {
-        Self {
-            root: None,
-            entries: Vec::new(),
-            max_depth: 12,
-            max_entries: 10_000,
-        }
+        Self { root: None, entries: Vec::new(), max_depth: 12, max_entries: 10_000 }
     }
 }
 
@@ -99,12 +94,7 @@ fn collect_entries(
         if out.len() >= max_entries {
             return Ok(());
         }
-        out.push(TreeEntry {
-            path: path.clone(),
-            name: name.clone(),
-            depth,
-            is_dir,
-        });
+        out.push(TreeEntry { path: path.clone(), name: name.clone(), depth, is_dir });
         if is_dir {
             collect_entries(&path, depth + 1, max_depth, max_entries, show_hidden, out)?;
         }
