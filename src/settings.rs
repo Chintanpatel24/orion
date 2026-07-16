@@ -120,12 +120,29 @@ impl Settings {
         };
 
         if visuals.dark_mode {
-            visuals.panel_fill = egui::Color32::from_rgb(13, 17, 23);
-            visuals.window_fill = egui::Color32::from_rgb(18, 24, 33);
-            visuals.extreme_bg_color = egui::Color32::from_rgb(7, 10, 15);
-            visuals.faint_bg_color = egui::Color32::from_rgb(22, 29, 40);
-            visuals.hyperlink_color = egui::Color32::from_rgb(124, 156, 255);
-            visuals.selection.bg_fill = egui::Color32::from_rgb(58, 91, 172);
+            visuals.panel_fill = egui::Color32::from_rgb(10, 11, 16);
+            visuals.window_fill = egui::Color32::from_rgb(17, 18, 26);
+            visuals.extreme_bg_color = egui::Color32::from_rgb(7, 8, 12);
+            visuals.faint_bg_color = egui::Color32::from_rgb(21, 23, 33);
+            visuals.hyperlink_color = egui::Color32::from_rgb(99, 137, 255);
+            visuals.selection.bg_fill = egui::Color32::from_rgb(33, 46, 75);
+
+            // Sleek, minimal borders
+            let subtle_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(20, 22, 32));
+            visuals.widgets.noninteractive.bg_stroke = subtle_stroke;
+            visuals.widgets.inactive.bg_stroke = egui::Stroke::NONE;
+            visuals.widgets.active.bg_stroke = egui::Stroke::NONE;
+            visuals.widgets.hovered.bg_stroke = egui::Stroke::NONE;
+
+            // Sleek widget backgrounds for interactive components
+            visuals.widgets.noninteractive.weak_bg_fill = egui::Color32::from_rgb(14, 15, 22);
+            visuals.widgets.inactive.weak_bg_fill = egui::Color32::from_rgb(17, 18, 26);
+            visuals.widgets.hovered.weak_bg_fill = egui::Color32::from_rgb(26, 29, 41);
+            visuals.widgets.active.weak_bg_fill = egui::Color32::from_rgb(34, 37, 53);
+
+            visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(17, 18, 26);
+            visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(26, 29, 41);
+            visuals.widgets.active.bg_fill = egui::Color32::from_rgb(34, 37, 53);
         }
         ctx.set_visuals(visuals);
 
@@ -137,8 +154,8 @@ impl Settings {
 
         for theme in themes {
             let mut style = (*ctx.style_of(theme)).clone();
-            style.spacing.item_spacing = egui::vec2(8.0, 6.0);
-            style.spacing.button_padding = egui::vec2(12.0, 6.0);
+            style.spacing.item_spacing = egui::vec2(6.0, 5.0);
+            style.spacing.button_padding = egui::vec2(10.0, 4.0);
             style.text_styles.insert(egui::TextStyle::Monospace, egui::FontId::monospace(self.font_size));
             style.text_styles.insert(egui::TextStyle::Body, egui::FontId::proportional(self.font_size));
             style.text_styles.insert(egui::TextStyle::Button, egui::FontId::proportional(self.font_size));
