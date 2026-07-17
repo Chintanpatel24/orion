@@ -40,6 +40,7 @@ IDE not for you, but for your agents.
 - Lightweight syntax highlighting
 - Low-power mode for older machines
 - Built-in GUI Git review
+- Integrated terminal panel (run system shell commands asynchronously)
 - Changed-file list
 - Stage and unstage selected file
 - Commit staged changes
@@ -228,6 +229,7 @@ In no-default-features mode, open files and folders through the command palette 
 | `Ctrl-P` | Command palette |
 | `Ctrl-F` | Search |
 | `Ctrl-G` | Git Review |
+| `Ctrl-T` | Integrated Terminal |
 | `Ctrl-Q` | Quit |
 
 On macOS, use the Command key where the system maps it as the command modifier.
