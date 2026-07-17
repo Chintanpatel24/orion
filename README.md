@@ -120,6 +120,22 @@ Linux and macOS:
 curl -fsSL https://raw.githubusercontent.com/Chintanpatel24/orion/main/scripts/install.sh | sh
 ```
 
+## Update to the latest version
+
+To fetch the latest changes, compile, and update your existing Orion installation directly from the GitHub repository, run the following one-liner in your terminal:
+
+Windows PowerShell:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/Chintanpatel24/orion/main/scripts/install.ps1 | iex
+```
+
+Linux and macOS:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Chintanpatel24/orion/main/scripts/install.sh | sh
+```
+
 Local source install:
 
 Windows PowerShell:
