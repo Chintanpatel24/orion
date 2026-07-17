@@ -12,6 +12,7 @@ pub enum PaletteAction {
     RefreshWorkspace,
     Settings,
     Help,
+    Terminal,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -48,6 +49,11 @@ pub fn palette_items() -> &'static [PaletteItem] {
             name: "Refresh workspace",
             detail: "Reload the file explorer",
             action: PaletteAction::RefreshWorkspace,
+        },
+        PaletteItem {
+            name: "Terminal",
+            detail: "Toggle the integrated system terminal",
+            action: PaletteAction::Terminal,
         },
         PaletteItem { name: "Settings", detail: "Open editor settings", action: PaletteAction::Settings },
         PaletteItem { name: "Help", detail: "Show important shortcuts", action: PaletteAction::Help },

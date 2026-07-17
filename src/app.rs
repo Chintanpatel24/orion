@@ -36,6 +36,11 @@ pub struct OrionApp {
     commit_message: String,
     status: String,
     pending_close: Option<CloseRequest>,
+    show_terminal: bool,
+    terminal_input: String,
+    terminal_output: String,
+    terminal_running: bool,
+    terminal_receiver: Option<std::sync::mpsc::Receiver<String>>,
 }
 
 impl OrionApp {
@@ -66,6 +71,11 @@ impl OrionApp {
             commit_message: String::new(),
             status: "Ready. Orion is an IDE not for you, but for your agents.".to_string(),
             pending_close: None,
+            show_terminal: false,
+            terminal_input: String::new(),
+            terminal_output: String::new(),
+            terminal_running: false,
+            terminal_receiver: None,
         };
 
         if let Some(root) = app.settings.last_workspace.clone() {
@@ -385,6 +395,7 @@ impl OrionApp {
         let palette = ctx.input(|i| i.key_pressed(egui::Key::P) && i.modifiers.command);
         let search = ctx.input(|i| i.key_pressed(egui::Key::F) && i.modifiers.command);
         let git_review = ctx.input(|i| i.key_pressed(egui::Key::G) && i.modifiers.command);
+        let terminal = ctx.input(|i| i.key_pressed(egui::Key::T) && i.modifiers.command);
         let quit = ctx.input(|i| i.key_pressed(egui::Key::Q) && i.modifiers.command);
 
         if new_file {
@@ -411,6 +422,9 @@ impl OrionApp {
         if git_review {
             self.show_git_review = true;
             self.refresh_git();
+        }
+        if terminal {
+            self.show_terminal = !self.show_terminal;
         }
         if quit {
             self.request_quit(ctx);
@@ -461,6 +475,9 @@ impl OrionApp {
             },
             PaletteAction::Settings => self.show_settings = true,
             PaletteAction::Help => self.show_help = true,
+            PaletteAction::Terminal => {
+                self.show_terminal = !self.show_terminal;
+            }
         }
     }
 
@@ -575,6 +592,10 @@ impl OrionApp {
                 ui.menu_button("View", |ui| {
                     if ui.button("Editor").clicked() {
                         self.show_git_review = false;
+                        ui.close();
+                    }
+                    if ui.button("Terminal    Ctrl-T").clicked() {
+                        self.show_terminal = !self.show_terminal;
                         ui.close();
                     }
                     if ui.button("Command palette    Ctrl-P").clicked() {
@@ -1116,6 +1137,7 @@ impl OrionApp {
             ui.monospace("Ctrl-P          Command palette");
             ui.monospace("Ctrl-F          Search");
             ui.monospace("Ctrl-G          Agent Git Review");
+            ui.monospace("Ctrl-T          Integrated Terminal");
             ui.monospace("Ctrl-Q          Quit");
         });
         self.show_help = open;
@@ -1161,16 +1183,126 @@ impl OrionApp {
             });
         });
     }
+
+    fn poll_terminal(&mut self) {
+        if let Some(rx) = &self.terminal_receiver {
+            if let Ok(output) = rx.try_recv() {
+                self.terminal_output.push_str(&output);
+                self.terminal_output.push_str("\n");
+                self.terminal_running = false;
+                self.terminal_receiver = None;
+            }
+        }
+    }
+
+    fn execute_terminal_command(&mut self) {
+        let command_str = self.terminal_input.trim().to_string();
+        if command_str.is_empty() {
+            return;
+        }
+        self.terminal_output.push_str(&format!("$ {}\n", command_str));
+        self.terminal_input.clear();
+        self.terminal_running = true;
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.terminal_receiver = Some(rx);
+
+        let workspace_root = self.workspace.root.clone();
+
+        std::thread::spawn(move || {
+            let mut cmd = if cfg!(target_os = "windows") {
+                let mut c = std::process::Command::new("cmd");
+                c.args(["/C", &command_str]);
+                c
+            } else {
+                let mut c = std::process::Command::new("sh");
+                c.args(["-c", &command_str]);
+                c
+            };
+
+            if let Some(root) = workspace_root {
+                cmd.current_dir(root);
+            }
+
+            match cmd.output() {
+                Ok(output) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                    let _ = tx.send(format!("{}{}", stdout, stderr));
+                }
+                Err(err) => {
+                    let _ = tx.send(format!("Error executing command: {}\n", err));
+                }
+            }
+        });
+    }
+
+    fn show_terminal_panel(&mut self, ui: &mut egui::Ui) {
+        if !self.show_terminal {
+            return;
+        }
+
+        egui::Panel::bottom("terminal_panel").resizable(true).default_size(180.0).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("Terminal").strong().color(egui::Color32::from_rgb(226, 237, 248)));
+                if self.terminal_running {
+                    ui.spinner();
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Clear").clicked() {
+                        self.terminal_output.clear();
+                    }
+                    if ui.button("Close").clicked() {
+                        self.show_terminal = false;
+                    }
+                });
+            });
+            ui.add_space(4.0);
+            ui.separator();
+            ui.add_space(4.0);
+
+            // Scrollable terminal output history
+            egui::ScrollArea::vertical().max_height(120.0).auto_shrink([false, false]).show(ui, |ui| {
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.terminal_output)
+                        .font(egui::TextStyle::Monospace)
+                        .desired_width(f32::INFINITY)
+                        .interactive(false),
+                );
+            });
+
+            ui.add_space(4.0);
+            ui.separator();
+            ui.add_space(4.0);
+
+            // Interactive command input
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("$").strong().color(egui::Color32::from_rgb(99, 137, 255)));
+                let response = ui.add(
+                    egui::TextEdit::singleline(&mut self.terminal_input)
+                        .hint_text("Enter terminal command (e.g. ls, cargo build)")
+                        .desired_width(f32::INFINITY),
+                );
+
+                if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    self.execute_terminal_command();
+                    response.request_focus(); // keep focus on terminal input!
+                }
+            });
+        });
+    }
 }
 
 impl eframe::App for OrionApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.poll_terminal();
         let ctx = ui.ctx().clone();
         self.handle_shortcuts(&ctx);
         self.show_top_bar(ui);
         self.show_status_bar(ui);
         self.show_workspace_panel(ui);
         self.show_main_area(ui);
+        self.show_terminal_panel(ui);
         self.show_palette_window(&ctx);
         self.show_search_window(&ctx);
         self.show_settings_window(&ctx);

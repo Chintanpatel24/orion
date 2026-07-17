@@ -40,6 +40,7 @@ IDE not for you, but for your agents.
 - Lightweight syntax highlighting
 - Low-power mode for older machines
 - Built-in GUI Git review
+- Integrated terminal panel (run system shell commands asynchronously)
 - Changed-file list
 - Stage and unstage selected file
 - Commit staged changes
@@ -107,6 +108,22 @@ Orion is built to run smoothly on very old hardware:
 ## Install with one command
 
 These commands install from the GitHub repository. If you publish this repo under your own account, update the repository URL inside `scripts/install.sh` and `scripts/install.ps1`, or pass `ORION_REPO_URL` as an environment variable.
+
+Windows PowerShell:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/Chintanpatel24/orion/main/scripts/install.ps1 | iex
+```
+
+Linux and macOS:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Chintanpatel24/orion/main/scripts/install.sh | sh
+```
+
+## Update to the latest version
+
+To fetch the latest changes, compile, and update your existing Orion installation directly from the GitHub repository, run the following one-liner in your terminal:
 
 Windows PowerShell:
 
@@ -212,6 +229,7 @@ In no-default-features mode, open files and folders through the command palette 
 | `Ctrl-P` | Command palette |
 | `Ctrl-F` | Search |
 | `Ctrl-G` | Git Review |
+| `Ctrl-T` | Integrated Terminal |
 | `Ctrl-Q` | Quit |
 
 On macOS, use the Command key where the system maps it as the command modifier.
