@@ -204,10 +204,6 @@ impl OrionApp {
             return;
         }
         self.documents.remove(idx);
-        if self.documents.is_empty() {
-            self.documents.push(Document::untitled(self.next_doc_id));
-            self.next_doc_id += 1;
-        }
         self.current = self.current.min(self.documents.len().saturating_sub(1));
     }
 
@@ -514,12 +510,6 @@ impl OrionApp {
                         self.show_git_review = true;
                         self.refresh_git();
                     }
-                    if ui.button("Project").clicked() {
-                        self.pick_and_open_workspace();
-                    }
-                    if ui.button("Settings").clicked() {
-                        self.show_settings = true;
-                    }
                 });
             });
             ui.add_space(4.0);
@@ -710,7 +700,6 @@ impl OrionApp {
             ui.separator();
 
             let Some(doc) = self.documents.get(self.current) else {
-                ui.label("No document");
                 return;
             };
             let highlight_limit = self.settings.highlight_limit_mb.saturating_mul(1024).saturating_mul(1024) as usize;
@@ -733,19 +722,21 @@ impl OrionApp {
                 ui.fonts_mut(|fonts| fonts.layout_job(job))
             };
 
-            let response = ui.add(
-                egui::TextEdit::multiline(&mut doc.text)
-                    .font(egui::TextStyle::Monospace)
-                    .code_editor()
-                    .desired_width(f32::INFINITY)
-                    .desired_rows(32)
-                    .lock_focus(true)
-                    .layouter(&mut layouter),
-            );
+            egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
+                let response = ui.add(
+                    egui::TextEdit::multiline(&mut doc.text)
+                        .font(egui::TextStyle::Monospace)
+                        .code_editor()
+                        .desired_width(f32::INFINITY)
+                        .desired_rows(32)
+                        .lock_focus(true)
+                        .layouter(&mut layouter),
+                );
 
-            if response.changed() {
-                doc.dirty = true;
-            }
+                if response.changed() {
+                    doc.dirty = true;
+                }
+            });
         });
     }
 
