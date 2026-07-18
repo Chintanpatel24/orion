@@ -504,138 +504,135 @@ impl OrionApp {
         egui::Panel::top("top_bar").show(ui, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
-                draw_orion_mark(ui);
-                ui.vertical(|ui| {
-                    ui.label(
-                        egui::RichText::new("Orion").size(20.0).strong().color(egui::Color32::from_rgb(226, 237, 248)),
-                    );
-                    ui.label(
-                        egui::RichText::new("IDE not for you, but for your agents")
-                            .size(12.0)
-                            .color(egui::Color32::from_rgb(142, 160, 184)),
-                    );
+                draw_orion_mark_small(ui);
+                ui.label(egui::RichText::new("Orion").strong().color(egui::Color32::from_rgb(226, 237, 248)));
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(8.0);
+
+                egui::MenuBar::new().ui(ui, |ui| {
+                    ui.menu_button("File", |ui| {
+                        if ui.button("New file    Ctrl-N").clicked() {
+                            self.new_document();
+                            ui.close();
+                        }
+                        if ui.button("Open file    Ctrl-O").clicked() {
+                            self.pick_and_open_file();
+                            ui.close();
+                        }
+                        if ui.button("Open folder    Ctrl-Shift-O").clicked() {
+                            self.pick_and_open_workspace();
+                            ui.close();
+                        }
+                        ui.separator();
+                        if ui.button("Save    Ctrl-S").clicked() {
+                            self.save_current();
+                            ui.close();
+                        }
+                        if ui.button("Save as    Ctrl-Shift-S").clicked() {
+                            self.save_current_as();
+                            ui.close();
+                        }
+                        if ui.button("Save all").clicked() {
+                            self.save_all();
+                            ui.close();
+                        }
+                        ui.separator();
+                        if ui.button("Quit    Ctrl-Q").clicked() {
+                            self.request_quit(&ctx);
+                            ui.close();
+                        }
+                    });
+
+                    ui.menu_button("Git", |ui| {
+                        if ui.button("Review changes    Ctrl-G").clicked() {
+                            self.show_git_review = true;
+                            self.refresh_git();
+                            ui.close();
+                        }
+                        if ui.button("Refresh Git").clicked() {
+                            self.refresh_git();
+                            ui.close();
+                        }
+                        if ui.button("Stage selected").clicked() {
+                            self.stage_selected();
+                            ui.close();
+                        }
+                        if ui.button("Unstage selected").clicked() {
+                            self.unstage_selected();
+                            ui.close();
+                        }
+                        if ui.button("Mark selected done").clicked() {
+                            self.mark_selected_done();
+                            ui.close();
+                        }
+                    });
+
+                    ui.menu_button("View", |ui| {
+                        if ui.button("Editor").clicked() {
+                            self.show_git_review = false;
+                            ui.close();
+                        }
+                        if ui.button("Terminal    Ctrl-T").clicked() {
+                            self.show_terminal = !self.show_terminal;
+                            ui.close();
+                        }
+                        if ui.button("Command palette    Ctrl-P").clicked() {
+                            self.show_palette = true;
+                            ui.close();
+                        }
+                        if ui.button("Search    Ctrl-F").clicked() {
+                            self.show_search = true;
+                            ui.close();
+                        }
+                        if ui.button("Settings").clicked() {
+                            self.show_settings = true;
+                            ui.close();
+                        }
+                        if ui.button("Refresh workspace").clicked() {
+                            let _ = self.workspace.refresh(self.settings.show_hidden_files);
+                            ui.close();
+                        }
+                    });
+
+                    ui.menu_button("Help", |ui| {
+                        if ui.button("Shortcuts").clicked() {
+                            self.show_help = true;
+                            ui.close();
+                        }
+                    });
                 });
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let git_review_text = if self.show_git_review { "Editor" } else { "Git Review" };
                     if ui
                         .add(
-                            egui::Button::new(egui::RichText::new("Git Review").strong())
-                                .fill(egui::Color32::from_rgb(36, 51, 82)),
+                            egui::Button::new(egui::RichText::new(git_review_text).strong())
+                                .fill(egui::Color32::from_rgb(33, 46, 75)),
                         )
                         .clicked()
                     {
-                        self.show_git_review = true;
-                        self.refresh_git();
+                        self.show_git_review = !self.show_git_review;
+                        if self.show_git_review {
+                            self.refresh_git();
+                        }
+                    }
+
+                    let terminal_btn_text = if self.show_terminal { "Hide Term" } else { "Terminal" };
+                    if ui.button(terminal_btn_text).clicked() {
+                        self.show_terminal = !self.show_terminal;
+                    }
+
+                    if !self.git_branch.is_empty() {
+                        ui.separator();
+                        ui.label(
+                            egui::RichText::new(format!("git: {}", self.git_branch))
+                                .color(egui::Color32::from_rgb(85, 224, 212)),
+                        );
                     }
                 });
             });
             ui.add_space(4.0);
-            ui.separator();
-            egui::MenuBar::new().ui(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("New file    Ctrl-N").clicked() {
-                        self.new_document();
-                        ui.close();
-                    }
-                    if ui.button("Open file    Ctrl-O").clicked() {
-                        self.pick_and_open_file();
-                        ui.close();
-                    }
-                    if ui.button("Open folder    Ctrl-Shift-O").clicked() {
-                        self.pick_and_open_workspace();
-                        ui.close();
-                    }
-                    ui.separator();
-                    if ui.button("Save    Ctrl-S").clicked() {
-                        self.save_current();
-                        ui.close();
-                    }
-                    if ui.button("Save as    Ctrl-Shift-S").clicked() {
-                        self.save_current_as();
-                        ui.close();
-                    }
-                    if ui.button("Save all").clicked() {
-                        self.save_all();
-                        ui.close();
-                    }
-                    ui.separator();
-                    if ui.button("Quit    Ctrl-Q").clicked() {
-                        self.request_quit(&ctx);
-                        ui.close();
-                    }
-                });
-
-                ui.menu_button("Git", |ui| {
-                    if ui.button("Review changes    Ctrl-G").clicked() {
-                        self.show_git_review = true;
-                        self.refresh_git();
-                        ui.close();
-                    }
-                    if ui.button("Refresh Git").clicked() {
-                        self.refresh_git();
-                        ui.close();
-                    }
-                    if ui.button("Stage selected").clicked() {
-                        self.stage_selected();
-                        ui.close();
-                    }
-                    if ui.button("Unstage selected").clicked() {
-                        self.unstage_selected();
-                        ui.close();
-                    }
-                    if ui.button("Mark selected done").clicked() {
-                        self.mark_selected_done();
-                        ui.close();
-                    }
-                });
-
-                ui.menu_button("View", |ui| {
-                    if ui.button("Editor").clicked() {
-                        self.show_git_review = false;
-                        ui.close();
-                    }
-                    if ui.button("Terminal    Ctrl-T").clicked() {
-                        self.show_terminal = !self.show_terminal;
-                        ui.close();
-                    }
-                    if ui.button("Command palette    Ctrl-P").clicked() {
-                        self.show_palette = true;
-                        ui.close();
-                    }
-                    if ui.button("Search    Ctrl-F").clicked() {
-                        self.show_search = true;
-                        ui.close();
-                    }
-                    if ui.button("Settings").clicked() {
-                        self.show_settings = true;
-                        ui.close();
-                    }
-                    if ui.button("Refresh workspace").clicked() {
-                        let _ = self.workspace.refresh(self.settings.show_hidden_files);
-                        ui.close();
-                    }
-                });
-
-                ui.menu_button("Help", |ui| {
-                    if ui.button("Shortcuts").clicked() {
-                        self.show_help = true;
-                        ui.close();
-                    }
-                });
-
-                ui.separator();
-                if !self.git_branch.is_empty() {
-                    ui.label(
-                        egui::RichText::new(format!("git: {}", self.git_branch))
-                            .color(egui::Color32::from_rgb(85, 224, 212)),
-                    );
-                    ui.separator();
-                }
-                ui.label(
-                    egui::RichText::new(format!("changes: {}", self.git_files.len()))
-                        .color(egui::Color32::from_rgb(142, 160, 184)),
-                );
-            });
         });
     }
 
@@ -1264,10 +1261,9 @@ impl OrionApp {
             // Scrollable terminal output history
             egui::ScrollArea::vertical().max_height(120.0).auto_shrink([false, false]).show(ui, |ui| {
                 ui.add(
-                    egui::TextEdit::multiline(&mut self.terminal_output)
+                    egui::TextEdit::multiline(&mut self.terminal_output.as_str())
                         .font(egui::TextStyle::Monospace)
-                        .desired_width(f32::INFINITY)
-                        .interactive(false),
+                        .desired_width(f32::INFINITY),
                 );
             });
 
@@ -1301,8 +1297,8 @@ impl eframe::App for OrionApp {
         self.show_top_bar(ui);
         self.show_status_bar(ui);
         self.show_workspace_panel(ui);
-        self.show_main_area(ui);
         self.show_terminal_panel(ui);
+        self.show_main_area(ui);
         self.show_palette_window(&ctx);
         self.show_search_window(&ctx);
         self.show_settings_window(&ctx);
@@ -1311,24 +1307,22 @@ impl eframe::App for OrionApp {
     }
 }
 
-fn draw_orion_mark(ui: &mut egui::Ui) {
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(32.0, 32.0), egui::Sense::hover());
+fn draw_orion_mark_small(ui: &mut egui::Ui) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(20.0, 20.0), egui::Sense::hover());
     let center = rect.center();
     let painter = ui.painter();
-    let bg = egui::Color32::from_rgb(15, 23, 42);
-    let border = egui::Color32::from_rgb(30, 41, 59);
+    let bg = egui::Color32::from_rgb(10, 11, 16);
     let ring_a = egui::Color32::from_rgb(203, 213, 225);
     let ring_b = egui::Color32::from_rgb(100, 116, 139);
 
-    let _border = border;
-    painter.rect_filled(rect.shrink(1.0), 8.0, bg);
+    painter.rect_filled(rect.shrink(1.0), 4.0, bg);
     painter.add(egui::Shape::line(
-        ellipse_points(center, 10.3, 4.4, -30.0_f32.to_radians()),
-        egui::Stroke::new(1.7, ring_a),
+        ellipse_points(center, 6.0, 2.5, -30.0_f32.to_radians()),
+        egui::Stroke::new(1.2, ring_a),
     ));
     painter.add(egui::Shape::line(
-        ellipse_points(center, 10.3, 4.4, 35.0_f32.to_radians()),
-        egui::Stroke::new(1.7, ring_b),
+        ellipse_points(center, 6.0, 2.5, 35.0_f32.to_radians()),
+        egui::Stroke::new(1.2, ring_b),
     ));
 }
 
