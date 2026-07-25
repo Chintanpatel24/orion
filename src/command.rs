@@ -8,6 +8,9 @@ pub enum PaletteAction {
     SaveAll,
     GitReview,
     RefreshGit,
+    CodeDiff,
+    ClearDiff,
+    GitConfig,
     Search,
     RefreshWorkspace,
     Settings,
@@ -43,6 +46,21 @@ pub fn palette_items() -> &'static [PaletteItem] {
             name: "Refresh Git",
             detail: "Reload branch and changed files",
             action: PaletteAction::RefreshGit,
+        },
+        PaletteItem {
+            name: "Code Diff",
+            detail: "View local changes against the last saved snapshot",
+            action: PaletteAction::CodeDiff,
+        },
+        PaletteItem {
+            name: "Clear diff",
+            detail: "Reset the code diff snapshot to the current text",
+            action: PaletteAction::ClearDiff,
+        },
+        PaletteItem {
+            name: "Git config",
+            detail: "Configure git user.name, user.email and default branch",
+            action: PaletteAction::GitConfig,
         },
         PaletteItem { name: "Search", detail: "Find text in the current file", action: PaletteAction::Search },
         PaletteItem {

@@ -1,4 +1,5 @@
 use crate::security;
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -16,11 +17,18 @@ pub struct Workspace {
     pub entries: Vec<TreeEntry>,
     pub max_depth: usize,
     pub max_entries: usize,
+    pub collapsed_dirs: HashSet<PathBuf>,
 }
 
 impl Default for Workspace {
     fn default() -> Self {
-        Self { root: None, entries: Vec::new(), max_depth: 12, max_entries: 10_000 }
+        Self {
+            root: None,
+            entries: Vec::new(),
+            max_depth: 12,
+            max_entries: 10_000,
+            collapsed_dirs: HashSet::new(),
+        }
     }
 }
 
@@ -38,8 +46,28 @@ impl Workspace {
         let Some(root) = self.root.clone() else {
             return Ok(());
         };
-        collect_entries(&root, 0, self.max_depth, self.max_entries, show_hidden, &mut self.entries)?;
+        collect_entries(
+            &root,
+            0,
+            self.max_depth,
+            self.max_entries,
+            show_hidden,
+            &self.collapsed_dirs,
+            &mut self.entries,
+        )?;
         Ok(())
+    }
+
+    pub fn toggle_collapsed(&mut self, path: &Path) {
+        if self.collapsed_dirs.contains(path) {
+            self.collapsed_dirs.remove(path);
+        } else {
+            self.collapsed_dirs.insert(path.to_path_buf());
+        }
+    }
+
+    pub fn is_collapsed(&self, path: &Path) -> bool {
+        self.collapsed_dirs.contains(path)
     }
 }
 
@@ -49,6 +77,7 @@ fn collect_entries(
     max_depth: usize,
     max_entries: usize,
     show_hidden: bool,
+    collapsed: &HashSet<PathBuf>,
     out: &mut Vec<TreeEntry>,
 ) -> Result<(), String> {
     if depth > max_depth || out.len() >= max_entries {
@@ -95,8 +124,8 @@ fn collect_entries(
             return Ok(());
         }
         out.push(TreeEntry { path: path.clone(), name: name.clone(), depth, is_dir });
-        if is_dir {
-            collect_entries(&path, depth + 1, max_depth, max_entries, show_hidden, out)?;
+        if is_dir && !collapsed.contains(&path) {
+            collect_entries(&path, depth + 1, max_depth, max_entries, show_hidden, collapsed, out)?;
         }
     }
 

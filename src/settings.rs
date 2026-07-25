@@ -13,6 +13,15 @@ pub enum ThemeMode {
     Dark,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct GitConfig {
+    pub user_name: String,
+    pub user_email: String,
+    pub default_branch: String,
+    pub configured: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewedChange {
     pub repo: PathBuf,
@@ -33,6 +42,7 @@ pub struct Settings {
     pub low_power_mode: bool,
     pub last_workspace: Option<PathBuf>,
     pub reviewed_changes: Vec<ReviewedChange>,
+    pub git_config: GitConfig,
 }
 
 impl Default for Settings {
@@ -48,6 +58,7 @@ impl Default for Settings {
             low_power_mode: false,
             last_workspace: None,
             reviewed_changes: Vec::new(),
+            git_config: GitConfig::default(),
         }
     }
 }
