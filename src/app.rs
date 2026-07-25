@@ -1,5 +1,5 @@
 use crate::command::{self, PaletteAction};
-use crate::document::Document;
+use crate::document::{Document, LineDiffKind};
 use crate::git::{self, DiffKind, DiffRow, GitFile};
 use crate::settings::{Settings, ThemeMode};
 use crate::syntax;
@@ -11,6 +11,15 @@ use std::path::PathBuf;
 enum CloseRequest {
     Document(usize),
     App,
+}
+
+/// Which main view is currently active.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MainView {
+    Editor,
+    GitReview,
+    CodeDiff,
+    GitConfig,
 }
 
 pub struct OrionApp {
@@ -26,7 +35,7 @@ pub struct OrionApp {
     replace_query: String,
     show_settings: bool,
     show_help: bool,
-    show_git_review: bool,
+    main_view: MainView,
     hide_done_changes: bool,
     git_repo: Option<PathBuf>,
     git_branch: String,
@@ -41,6 +50,18 @@ pub struct OrionApp {
     terminal_output: String,
     terminal_running: bool,
     terminal_receiver: Option<std::sync::mpsc::Receiver<String>>,
+    // Git config form fields
+    git_config_name: String,
+    git_config_email: String,
+    git_config_branch: String,
+    git_config_status: String,
+    // Branch management
+    new_branch_name: String,
+    git_branches: Vec<String>,
+    // Git log
+    git_log: Vec<String>,
+    // Code diff panel state
+    code_diff_doc_idx: Option<usize>,
 }
 
 impl OrionApp {
@@ -61,7 +82,7 @@ impl OrionApp {
             replace_query: String::new(),
             show_settings: false,
             show_help: false,
-            show_git_review: false,
+            main_view: MainView::Editor,
             hide_done_changes: true,
             git_repo: None,
             git_branch: String::new(),
@@ -76,12 +97,25 @@ impl OrionApp {
             terminal_output: String::new(),
             terminal_running: false,
             terminal_receiver: None,
+            git_config_name: String::new(),
+            git_config_email: String::new(),
+            git_config_branch: String::new(),
+            git_config_status: String::new(),
+            new_branch_name: String::new(),
+            git_branches: Vec::new(),
+            git_log: Vec::new(),
+            code_diff_doc_idx: None,
         };
 
         if let Some(root) = app.settings.last_workspace.clone() {
             let _ = app.workspace.open(root, app.settings.show_hidden_files);
             app.refresh_git();
         }
+
+        // Load git config from settings
+        app.git_config_name = app.settings.git_config.user_name.clone();
+        app.git_config_email = app.settings.git_config.user_email.clone();
+        app.git_config_branch = app.settings.git_config.default_branch.clone();
 
         for arg in std::env::args_os().skip(1) {
             let path = PathBuf::from(arg);
@@ -100,14 +134,14 @@ impl OrionApp {
         self.next_doc_id += 1;
         self.documents.push(Document::untitled(id));
         self.current = self.documents.len() - 1;
-        self.show_git_review = false;
+        self.main_view = MainView::Editor;
         self.status = "New file created".to_string();
     }
 
     fn open_document(&mut self, path: PathBuf) {
         if let Some(idx) = self.documents.iter().position(|doc| doc.path.as_deref() == Some(path.as_path())) {
             self.current = idx;
-            self.show_git_review = false;
+            self.main_view = MainView::Editor;
             self.status = format!("Already open: {}", path.display());
             return;
         }
@@ -125,7 +159,7 @@ impl OrionApp {
                     self.documents.push(document);
                     self.current = self.documents.len() - 1;
                 }
-                self.show_git_review = false;
+                self.main_view = MainView::Editor;
                 self.status = format!("Opened {}", path.display());
             }
             Err(err) => self.status = err,
@@ -214,7 +248,13 @@ impl OrionApp {
             return;
         }
         self.documents.remove(idx);
-        self.current = self.current.min(self.documents.len().saturating_sub(1));
+        if self.documents.is_empty() {
+            self.documents.push(Document::untitled(self.next_doc_id));
+            self.next_doc_id += 1;
+            self.current = 0;
+        } else {
+            self.current = self.current.min(self.documents.len().saturating_sub(1));
+        }
     }
 
     fn current_document(&self) -> Option<&Document> {
@@ -232,7 +272,9 @@ impl OrionApp {
             self.git_files.clear();
             self.diff_rows.clear();
             self.git_branch.clear();
-            self.status = "Open a project folder to use Git Review".to_string();
+            self.git_branches.clear();
+            self.git_log.clear();
+            self.status = "Open a project folder to use Git".to_string();
             return;
         };
 
@@ -240,6 +282,8 @@ impl OrionApp {
             Ok(Some(repo)) => {
                 self.git_repo = Some(repo.clone());
                 self.git_branch = git::branch(&repo).unwrap_or_else(|_| "detached".to_string());
+                self.git_branches = git::list_branches(&repo).unwrap_or_default();
+                self.git_log = git::recent_log(&repo, 15).unwrap_or_default();
                 match git::changed_files(&repo) {
                     Ok(files) => {
                         self.git_files = files;
@@ -255,6 +299,8 @@ impl OrionApp {
                 self.git_files.clear();
                 self.diff_rows.clear();
                 self.git_branch.clear();
+                self.git_branches.clear();
+                self.git_log.clear();
                 self.status = "The current workspace is not a Git repository".to_string();
             }
             Err(err) => self.status = err,
@@ -386,6 +432,39 @@ impl OrionApp {
         }
     }
 
+    fn stage_all_and_commit(&mut self) {
+        let Some(repo) = self.git_repo.clone() else {
+            self.status = "No Git repository open".to_string();
+            return;
+        };
+        if let Err(err) = git::stage_all(&repo) {
+            self.status = err;
+            return;
+        }
+        match git::commit(&repo, &self.commit_message) {
+            Ok(()) => {
+                self.commit_message.clear();
+                self.status = "All changes staged and committed".to_string();
+                self.refresh_git();
+            }
+            Err(err) => self.status = err,
+        }
+    }
+
+    fn clear_all_diffs(&mut self) {
+        for doc in &mut self.documents {
+            doc.clear_diff();
+        }
+        self.status = "All code diffs cleared".to_string();
+    }
+
+    fn clear_current_diff(&mut self) {
+        if let Some(doc) = self.documents.get_mut(self.current) {
+            doc.clear_diff();
+            self.status = format!("Diff cleared for {}", doc.title);
+        }
+    }
+
     fn handle_shortcuts(&mut self, ctx: &egui::Context) {
         let new_file = ctx.input(|i| i.key_pressed(egui::Key::N) && i.modifiers.command);
         let open_file = ctx.input(|i| i.key_pressed(egui::Key::O) && i.modifiers.command && !i.modifiers.shift);
@@ -396,6 +475,7 @@ impl OrionApp {
         let search = ctx.input(|i| i.key_pressed(egui::Key::F) && i.modifiers.command);
         let git_review = ctx.input(|i| i.key_pressed(egui::Key::G) && i.modifiers.command);
         let terminal = ctx.input(|i| i.key_pressed(egui::Key::T) && i.modifiers.command);
+        let clear_diff = ctx.input(|i| i.key_pressed(egui::Key::D) && i.modifiers.command);
         let quit = ctx.input(|i| i.key_pressed(egui::Key::Q) && i.modifiers.command);
 
         if new_file {
@@ -420,11 +500,14 @@ impl OrionApp {
             self.show_search = true;
         }
         if git_review {
-            self.show_git_review = true;
+            self.main_view = MainView::GitReview;
             self.refresh_git();
         }
         if terminal {
             self.show_terminal = !self.show_terminal;
+        }
+        if clear_diff {
+            self.clear_current_diff();
         }
         if quit {
             self.request_quit(ctx);
@@ -464,10 +547,18 @@ impl OrionApp {
             PaletteAction::SaveAs => self.save_current_as(),
             PaletteAction::SaveAll => self.save_all(),
             PaletteAction::GitReview => {
-                self.show_git_review = true;
+                self.main_view = MainView::GitReview;
                 self.refresh_git();
             }
             PaletteAction::RefreshGit => self.refresh_git(),
+            PaletteAction::CodeDiff => {
+                self.code_diff_doc_idx = Some(self.current);
+                self.main_view = MainView::CodeDiff;
+            }
+            PaletteAction::ClearDiff => self.clear_current_diff(),
+            PaletteAction::GitConfig => {
+                self.main_view = MainView::GitConfig;
+            }
             PaletteAction::Search => self.show_search = true,
             PaletteAction::RefreshWorkspace => match self.workspace.refresh(self.settings.show_hidden_files) {
                 Ok(()) => self.status = "Workspace refreshed".to_string(),
@@ -484,8 +575,17 @@ impl OrionApp {
     fn execute_freeform_palette_command(&mut self) -> bool {
         let query = self.palette_query.trim().to_string();
         if query.eq_ignore_ascii_case("git") || query.eq_ignore_ascii_case("review") {
-            self.show_git_review = true;
+            self.main_view = MainView::GitReview;
             self.refresh_git();
+            return true;
+        }
+        if query.eq_ignore_ascii_case("diff") || query.eq_ignore_ascii_case("code diff") {
+            self.code_diff_doc_idx = Some(self.current);
+            self.main_view = MainView::CodeDiff;
+            return true;
+        }
+        if query.eq_ignore_ascii_case("config") || query.eq_ignore_ascii_case("git config") {
+            self.main_view = MainView::GitConfig;
             return true;
         }
         if let Some(path) = query.strip_prefix("open ").map(str::trim).filter(|s| !s.is_empty()) {
@@ -517,6 +617,32 @@ impl OrionApp {
                 });
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Code Diff button with change count indicator
+                    let diff_count: usize = self.documents.iter().map(|doc| doc.diff_line_count()).sum();
+                    let diff_label = if diff_count > 0 {
+                        format!("Code Diff ({})", diff_count)
+                    } else {
+                        "Code Diff".to_string()
+                    };
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                egui::RichText::new(diff_label)
+                                    .strong()
+                                    .color(if diff_count > 0 {
+                                        egui::Color32::from_rgb(255, 200, 100)
+                                    } else {
+                                        egui::Color32::from_rgb(216, 222, 233)
+                                    }),
+                            )
+                            .fill(egui::Color32::from_rgb(42, 36, 20)),
+                        )
+                        .clicked()
+                    {
+                        self.code_diff_doc_idx = Some(self.current);
+                        self.main_view = MainView::CodeDiff;
+                    }
+
                     if ui
                         .add(
                             egui::Button::new(egui::RichText::new("Git Review").strong())
@@ -524,7 +650,7 @@ impl OrionApp {
                         )
                         .clicked()
                     {
-                        self.show_git_review = true;
+                        self.main_view = MainView::GitReview;
                         self.refresh_git();
                     }
                 });
@@ -567,14 +693,19 @@ impl OrionApp {
 
                 ui.menu_button("Git", |ui| {
                     if ui.button("Review changes    Ctrl-G").clicked() {
-                        self.show_git_review = true;
+                        self.main_view = MainView::GitReview;
                         self.refresh_git();
+                        ui.close();
+                    }
+                    if ui.button("Git config").clicked() {
+                        self.main_view = MainView::GitConfig;
                         ui.close();
                     }
                     if ui.button("Refresh Git").clicked() {
                         self.refresh_git();
                         ui.close();
                     }
+                    ui.separator();
                     if ui.button("Stage selected").clicked() {
                         self.stage_selected();
                         ui.close();
@@ -583,6 +714,19 @@ impl OrionApp {
                         self.unstage_selected();
                         ui.close();
                     }
+                    if ui.button("Stage all").clicked() {
+                        if let Some(repo) = self.git_repo.clone() {
+                            match git::stage_all(&repo) {
+                                Ok(()) => {
+                                    self.status = "All files staged".to_string();
+                                    self.refresh_git();
+                                }
+                                Err(err) => self.status = err,
+                            }
+                        }
+                        ui.close();
+                    }
+                    ui.separator();
                     if ui.button("Mark selected done").clicked() {
                         self.mark_selected_done();
                         ui.close();
@@ -591,7 +735,12 @@ impl OrionApp {
 
                 ui.menu_button("View", |ui| {
                     if ui.button("Editor").clicked() {
-                        self.show_git_review = false;
+                        self.main_view = MainView::Editor;
+                        ui.close();
+                    }
+                    if ui.button("Code Diff    Ctrl-D").clicked() {
+                        self.code_diff_doc_idx = Some(self.current);
+                        self.main_view = MainView::CodeDiff;
                         ui.close();
                     }
                     if ui.button("Terminal    Ctrl-T").clicked() {
@@ -675,23 +824,47 @@ impl OrionApp {
                 ui.add_space(8.0);
 
                 let mut open_path = None;
+                let mut toggle_dir = None;
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for entry in &self.workspace.entries {
                         ui.horizontal(|ui| {
                             ui.add_space((entry.depth * 14) as f32);
-                            let label = if entry.is_dir { format!("{}/", entry.name) } else { entry.name.clone() };
-                            let text = if entry.is_dir {
-                                egui::RichText::new(label).color(egui::Color32::from_rgb(142, 160, 184))
+                            if entry.is_dir {
+                                let collapsed = self.workspace.is_collapsed(&entry.path);
+                                let arrow = if collapsed { ">" } else { "v" };
+                                let label = format!("{} {}/", arrow, entry.name);
+                                let text =
+                                    egui::RichText::new(label).color(egui::Color32::from_rgb(142, 160, 184));
+                                let response = ui.selectable_label(false, text);
+                                if response.clicked() {
+                                    toggle_dir = Some(entry.path.clone());
+                                }
                             } else {
-                                egui::RichText::new(label).color(egui::Color32::from_rgb(216, 222, 233))
-                            };
-                            let response = ui.selectable_label(false, text);
-                            if response.clicked() && !entry.is_dir {
-                                open_path = Some(entry.path.clone());
+                                // Show file icon hint based on extension
+                                let icon = file_icon_hint(&entry.name);
+                                let label = format!("{} {}", icon, entry.name);
+                                let is_open = self
+                                    .documents
+                                    .iter()
+                                    .any(|doc| doc.path.as_deref() == Some(entry.path.as_path()));
+                                let color = if is_open {
+                                    egui::Color32::from_rgb(143, 179, 255)
+                                } else {
+                                    egui::Color32::from_rgb(216, 222, 233)
+                                };
+                                let text = egui::RichText::new(label).color(color);
+                                let response = ui.selectable_label(false, text);
+                                if response.clicked() {
+                                    open_path = Some(entry.path.clone());
+                                }
                             }
                         });
                     }
                 });
+                if let Some(path) = toggle_dir {
+                    self.workspace.toggle_collapsed(&path);
+                    let _ = self.workspace.refresh(self.settings.show_hidden_files);
+                }
                 if let Some(path) = open_path {
                     self.open_document(path);
                 }
@@ -708,10 +881,11 @@ impl OrionApp {
     }
 
     fn show_main_area(&mut self, ui: &mut egui::Ui) {
-        if self.show_git_review {
-            self.show_git_review_panel(ui);
-        } else {
-            self.show_editor(ui);
+        match self.main_view {
+            MainView::Editor => self.show_editor(ui),
+            MainView::GitReview => self.show_git_review_panel(ui),
+            MainView::CodeDiff => self.show_code_diff_panel(ui),
+            MainView::GitConfig => self.show_git_config_panel(ui),
         }
     }
 
@@ -766,10 +940,18 @@ impl OrionApp {
         ui.horizontal_wrapped(|ui| {
             for idx in 0..self.documents.len() {
                 let doc = &self.documents[idx];
-                let selected = idx == self.current;
-                if ui.selectable_label(selected, doc.display_title()).clicked() {
+                let selected = idx == self.current && self.main_view == MainView::Editor;
+                let has_diff = doc.has_diff_changes();
+
+                let title_text = if has_diff {
+                    egui::RichText::new(doc.display_title()).color(egui::Color32::from_rgb(255, 200, 100))
+                } else {
+                    egui::RichText::new(doc.display_title())
+                };
+
+                if ui.selectable_label(selected, title_text).clicked() {
                     self.current = idx;
-                    self.show_git_review = false;
+                    self.main_view = MainView::Editor;
                 }
                 if ui.small_button("x").on_hover_text("Close tab").clicked() {
                     close_idx = Some(idx);
@@ -780,6 +962,434 @@ impl OrionApp {
         if let Some(idx) = close_idx {
             self.request_close_document(idx);
         }
+    }
+
+    // ---- Code Diff Panel ----
+    fn show_code_diff_panel(&mut self, ui: &mut egui::Ui) {
+        egui::CentralPanel::default().show(ui, |ui| {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(
+                        egui::RichText::new("Code Diff")
+                            .size(24.0)
+                            .strong()
+                            .color(egui::Color32::from_rgb(226, 237, 248)),
+                    );
+                    ui.label(
+                        egui::RichText::new(
+                            "Shows changes between the last snapshot and the current text. Use Check All or Ctrl-D to clear.",
+                        )
+                        .color(egui::Color32::from_rgb(142, 160, 184)),
+                    );
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Editor").clicked() {
+                        self.main_view = MainView::Editor;
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(egui::RichText::new("Check All").strong())
+                                .fill(egui::Color32::from_rgb(29, 78, 64)),
+                        )
+                        .on_hover_text("Clear all diffs across every open file")
+                        .clicked()
+                    {
+                        self.clear_all_diffs();
+                    }
+                });
+            });
+
+            ui.add_space(10.0);
+
+            // Summary tiles
+            let total_files_changed: usize = self.documents.iter().filter(|doc| doc.has_diff_changes()).count();
+            let total_added: usize = self.documents.iter().map(|doc| doc.diff_added_count()).sum();
+            let total_removed: usize = self.documents.iter().map(|doc| doc.diff_removed_count()).sum();
+            ui.horizontal(|ui| {
+                summary_tile(ui, "Files changed", &total_files_changed.to_string());
+                summary_tile(ui, "Lines added", &format!("+{total_added}"));
+                summary_tile(ui, "Lines removed", &format!("-{total_removed}"));
+            });
+
+            ui.add_space(10.0);
+            ui.separator();
+            ui.add_space(6.0);
+
+            ui.horizontal(|ui| {
+                // Left: file list with diff indicators
+                ui.vertical(|ui| {
+                    ui.set_width(280.0);
+                    ui.group(|ui| {
+                        ui.heading("Changed files");
+                        let docs_with_changes: Vec<(usize, String, usize)> = self
+                            .documents
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, doc)| doc.has_diff_changes())
+                            .map(|(idx, doc)| (idx, doc.display_title(), doc.diff_line_count()))
+                            .collect();
+
+                        if docs_with_changes.is_empty() {
+                            ui.add_space(8.0);
+                            ui.label("No local changes detected.");
+                        }
+
+                        egui::ScrollArea::vertical().max_height(430.0).show(ui, |ui| {
+                            for (idx, title, count) in &docs_with_changes {
+                                let selected = self.code_diff_doc_idx == Some(*idx);
+                                let label = format!("{} ({} changes)", title, count);
+                                let response = ui.selectable_label(
+                                    selected,
+                                    egui::RichText::new(label)
+                                        .monospace()
+                                        .color(egui::Color32::from_rgb(255, 200, 100)),
+                                );
+                                if response.clicked() {
+                                    self.code_diff_doc_idx = Some(*idx);
+                                }
+                            }
+                        });
+
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            if ui
+                                .add(
+                                    egui::Button::new(egui::RichText::new("Check All").strong())
+                                        .fill(egui::Color32::from_rgb(29, 78, 64)),
+                                )
+                                .clicked()
+                            {
+                                self.clear_all_diffs();
+                            }
+                            if ui.button("Clear selected").clicked() {
+                                if let Some(idx) = self.code_diff_doc_idx {
+                                    if let Some(doc) = self.documents.get_mut(idx) {
+                                        doc.clear_diff();
+                                        self.status = format!("Diff cleared for {}", doc.title);
+                                    }
+                                }
+                            }
+                        });
+                    });
+                });
+
+                ui.separator();
+
+                // Right: diff view for the selected document
+                ui.vertical(|ui| {
+                    ui.set_min_width(650.0);
+                    ui.group(|ui| {
+                        let selected_title = self
+                            .code_diff_doc_idx
+                            .and_then(|idx| self.documents.get(idx))
+                            .map(|doc| doc.display_title())
+                            .unwrap_or_else(|| "No file selected".to_string());
+
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(&selected_title)
+                                    .size(18.0)
+                                    .strong()
+                                    .color(egui::Color32::from_rgb(226, 237, 248)),
+                            );
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.button("Clear this diff").clicked() {
+                                    if let Some(idx) = self.code_diff_doc_idx {
+                                        if let Some(doc) = self.documents.get_mut(idx) {
+                                            doc.clear_diff();
+                                            self.status = format!("Diff cleared for {}", doc.title);
+                                        }
+                                    }
+                                }
+                            });
+                        });
+                        ui.separator();
+
+                        // Render the line-by-line diff
+                        let diff_lines = self
+                            .code_diff_doc_idx
+                            .and_then(|idx| self.documents.get(idx))
+                            .map(|doc| doc.diff_lines())
+                            .unwrap_or_default();
+
+                        if diff_lines.is_empty() || !diff_lines.iter().any(|d| d.kind != LineDiffKind::Unchanged) {
+                            ui.add_space(16.0);
+                            ui.label("No changes in this file.");
+                        } else {
+                            egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
+                                draw_code_diff_lines(ui, &diff_lines);
+                            });
+                        }
+                    });
+                });
+            });
+        });
+    }
+
+    // ---- Git Config Panel ----
+    fn show_git_config_panel(&mut self, ui: &mut egui::Ui) {
+        egui::CentralPanel::default().show(ui, |ui| {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(
+                        egui::RichText::new("Git Configuration")
+                            .size(24.0)
+                            .strong()
+                            .color(egui::Color32::from_rgb(226, 237, 248)),
+                    );
+                    ui.label(
+                        egui::RichText::new(
+                            "Configure your Git identity and preferences. This will be applied to the current repository.",
+                        )
+                        .color(egui::Color32::from_rgb(142, 160, 184)),
+                    );
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Editor").clicked() {
+                        self.main_view = MainView::Editor;
+                    }
+                });
+            });
+
+            ui.add_space(16.0);
+
+            ui.horizontal(|ui| {
+                // Left: Config form
+                ui.vertical(|ui| {
+                    ui.set_width(440.0);
+                    ui.group(|ui| {
+                        ui.heading("Git Identity");
+                        ui.add_space(8.0);
+
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("User name").strong().color(egui::Color32::from_rgb(216, 222, 233)));
+                            ui.add_space(20.0);
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.git_config_name)
+                                    .hint_text("Your Name")
+                                    .desired_width(260.0),
+                            );
+                        });
+                        ui.add_space(4.0);
+
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("User email").strong().color(egui::Color32::from_rgb(216, 222, 233)));
+                            ui.add_space(18.0);
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.git_config_email)
+                                    .hint_text("you@example.com")
+                                    .desired_width(260.0),
+                            );
+                        });
+                        ui.add_space(4.0);
+
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new("Default branch")
+                                    .strong()
+                                    .color(egui::Color32::from_rgb(216, 222, 233)),
+                            );
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.git_config_branch)
+                                    .hint_text("main")
+                                    .desired_width(260.0),
+                            );
+                        });
+
+                        ui.add_space(12.0);
+
+                        ui.horizontal(|ui| {
+                            if ui
+                                .add(
+                                    egui::Button::new(egui::RichText::new("Apply config").strong())
+                                        .fill(egui::Color32::from_rgb(29, 78, 64)),
+                                )
+                                .clicked()
+                            {
+                                // Save to settings
+                                self.settings.git_config.user_name = self.git_config_name.clone();
+                                self.settings.git_config.user_email = self.git_config_email.clone();
+                                self.settings.git_config.default_branch = self.git_config_branch.clone();
+                                self.settings.git_config.configured = true;
+                                let _ = self.settings.save();
+
+                                // Apply to repository
+                                if let Some(repo) = self.git_repo.clone() {
+                                    match git::apply_config(&repo, &self.git_config_name, &self.git_config_email) {
+                                        Ok(()) => {
+                                            self.git_config_status = "Configuration applied to repository".to_string();
+                                            self.status = "Git config applied".to_string();
+                                        }
+                                        Err(err) => {
+                                            self.git_config_status = err.clone();
+                                            self.status = err;
+                                        }
+                                    }
+                                } else {
+                                    self.git_config_status =
+                                        "Settings saved. Open a Git repository to apply.".to_string();
+                                }
+                            }
+
+                            if ui.button("Init repository").on_hover_text("Run git init in the workspace root").clicked() {
+                                if let Some(root) = self.workspace.root.clone() {
+                                    match git::init_repo(&root) {
+                                        Ok(()) => {
+                                            self.git_config_status = "Repository initialized".to_string();
+                                            self.status = "Git repository initialized".to_string();
+                                            self.refresh_git();
+                                            // Auto-apply config if set
+                                            if !self.git_config_name.is_empty() && !self.git_config_email.is_empty() {
+                                                let _ = git::apply_config(&root, &self.git_config_name, &self.git_config_email);
+                                            }
+                                        }
+                                        Err(err) => {
+                                            self.git_config_status = err.clone();
+                                            self.status = err;
+                                        }
+                                    }
+                                } else {
+                                    self.git_config_status = "Open a folder first".to_string();
+                                }
+                            }
+                        });
+
+                        if !self.git_config_status.is_empty() {
+                            ui.add_space(8.0);
+                            ui.label(
+                                egui::RichText::new(&self.git_config_status)
+                                    .color(egui::Color32::from_rgb(85, 224, 212)),
+                            );
+                        }
+
+                        // Show config state
+                        ui.add_space(12.0);
+                        ui.separator();
+                        ui.label(
+                            egui::RichText::new("Current state")
+                                .small()
+                                .color(egui::Color32::from_rgb(142, 160, 184)),
+                        );
+                        let configured = self.settings.git_config.configured;
+                        ui.label(
+                            egui::RichText::new(if configured { "Configured" } else { "Not configured" })
+                                .strong()
+                                .color(if configured {
+                                    egui::Color32::from_rgb(85, 224, 212)
+                                } else {
+                                    egui::Color32::from_rgb(245, 190, 190)
+                                }),
+                        );
+                        if let Some(repo) = &self.git_repo {
+                            ui.label(format!("Repository: {}", repo.display()));
+                        } else {
+                            ui.label("No repository detected");
+                        }
+                    });
+                });
+
+                ui.separator();
+
+                // Right: Branch management and log
+                ui.vertical(|ui| {
+                    ui.set_min_width(400.0);
+
+                    // Branch management
+                    ui.group(|ui| {
+                        ui.heading("Branches");
+                        ui.add_space(4.0);
+
+                        if !self.git_branch.is_empty() {
+                            ui.label(
+                                egui::RichText::new(format!("Current: {}", self.git_branch))
+                                    .strong()
+                                    .color(egui::Color32::from_rgb(85, 224, 212)),
+                            );
+                        }
+
+                        ui.add_space(4.0);
+
+                        // List branches
+                        if !self.git_branches.is_empty() {
+                            egui::ScrollArea::vertical().max_height(120.0).show(ui, |ui| {
+                                let mut switch_to = None;
+                                for branch_name in &self.git_branches {
+                                    let is_current = *branch_name == self.git_branch;
+                                    let color = if is_current {
+                                        egui::Color32::from_rgb(85, 224, 212)
+                                    } else {
+                                        egui::Color32::from_rgb(216, 222, 233)
+                                    };
+                                    let response = ui.selectable_label(
+                                        is_current,
+                                        egui::RichText::new(branch_name).monospace().color(color),
+                                    );
+                                    if response.clicked() && !is_current {
+                                        switch_to = Some(branch_name.clone());
+                                    }
+                                }
+                                if let Some(name) = switch_to {
+                                    if let Some(repo) = self.git_repo.clone() {
+                                        match git::switch_branch(&repo, &name) {
+                                            Ok(()) => {
+                                                self.status = format!("Switched to branch {name}");
+                                                self.refresh_git();
+                                            }
+                                            Err(err) => self.status = err,
+                                        }
+                                    }
+                                }
+                            });
+                        }
+
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.new_branch_name)
+                                    .hint_text("new-branch-name")
+                                    .desired_width(200.0),
+                            );
+                            if ui.button("Create branch").clicked() {
+                                if let Some(repo) = self.git_repo.clone() {
+                                    match git::create_branch(&repo, &self.new_branch_name) {
+                                        Ok(()) => {
+                                            self.status = format!("Created branch {}", self.new_branch_name);
+                                            self.new_branch_name.clear();
+                                            self.refresh_git();
+                                        }
+                                        Err(err) => self.status = err,
+                                    }
+                                }
+                            }
+                        });
+                    });
+
+                    ui.add_space(8.0);
+
+                    // Recent commits
+                    ui.group(|ui| {
+                        ui.heading("Recent commits");
+                        ui.add_space(4.0);
+
+                        if self.git_log.is_empty() {
+                            ui.label("No commits yet, or not a Git repository.");
+                        } else {
+                            egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                                for entry in &self.git_log {
+                                    ui.label(
+                                        egui::RichText::new(entry)
+                                            .monospace()
+                                            .color(egui::Color32::from_rgb(216, 222, 233)),
+                                    );
+                                }
+                            });
+                        }
+                    });
+                });
+            });
+        });
     }
 
     fn show_git_review_panel(&mut self, ui: &mut egui::Ui) {
@@ -802,7 +1412,7 @@ impl OrionApp {
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("Editor").clicked() {
-                        self.show_git_review = false;
+                        self.main_view = MainView::Editor;
                     }
                     if ui.button("Refresh").clicked() {
                         self.refresh_git();
@@ -894,6 +1504,17 @@ impl OrionApp {
                             if ui.button("Unstage").clicked() {
                                 self.unstage_selected();
                             }
+                            if ui.button("Stage all").clicked() {
+                                if let Some(repo) = self.git_repo.clone() {
+                                    match git::stage_all(&repo) {
+                                        Ok(()) => {
+                                            self.status = "All files staged".to_string();
+                                            self.refresh_git();
+                                        }
+                                        Err(err) => self.status = err,
+                                    }
+                                }
+                            }
                         });
                         ui.horizontal(|ui| {
                             if ui
@@ -913,9 +1534,14 @@ impl OrionApp {
                         ui.separator();
                         ui.label(egui::RichText::new("Commit staged changes").strong());
                         ui.text_edit_singleline(&mut self.commit_message);
-                        if ui.button("Commit").clicked() {
-                            self.commit_staged();
-                        }
+                        ui.horizontal(|ui| {
+                            if ui.button("Commit").clicked() {
+                                self.commit_staged();
+                            }
+                            if ui.button("Stage all + Commit").clicked() {
+                                self.stage_all_and_commit();
+                            }
+                        });
                     });
                 });
 
@@ -985,6 +1611,15 @@ impl OrionApp {
                 ui.separator();
                 ui.label(format!("changes: {}", self.git_files.len()));
                 ui.separator();
+                // Show local diff count
+                let diff_count: usize = self.documents.iter().map(|doc| doc.diff_line_count()).sum();
+                if diff_count > 0 {
+                    ui.label(
+                        egui::RichText::new(format!("diff: {diff_count}"))
+                            .color(egui::Color32::from_rgb(255, 200, 100)),
+                    );
+                    ui.separator();
+                }
                 if let Some(doc) = self.current_document() {
                     ui.label(format!("{} lines", doc.line_count()));
                     ui.separator();
@@ -1007,7 +1642,7 @@ impl OrionApp {
             .default_width(560.0)
             .show(ctx, |ui| {
                 ui.label("Type a command or select an action.");
-                ui.label("Freeform commands: open <path>, folder <path>, git, review.");
+                ui.label("Freeform: open <path>, folder <path>, git, review, diff, config.");
                 let enter =
                     ui.add(egui::TextEdit::singleline(&mut self.palette_query).hint_text("Command")).lost_focus()
                         && ui.input(|i| i.key_pressed(egui::Key::Enter));
@@ -1137,6 +1772,7 @@ impl OrionApp {
             ui.monospace("Ctrl-P          Command palette");
             ui.monospace("Ctrl-F          Search");
             ui.monospace("Ctrl-G          Agent Git Review");
+            ui.monospace("Ctrl-D          Clear current code diff");
             ui.monospace("Ctrl-T          Integrated Terminal");
             ui.monospace("Ctrl-Q          Quit");
         });
@@ -1316,11 +1952,11 @@ fn draw_orion_mark(ui: &mut egui::Ui) {
     let center = rect.center();
     let painter = ui.painter();
     let bg = egui::Color32::from_rgb(15, 23, 42);
-    let border = egui::Color32::from_rgb(30, 41, 59);
     let ring_a = egui::Color32::from_rgb(203, 213, 225);
     let ring_b = egui::Color32::from_rgb(100, 116, 139);
+    // Border color reserved for future ring outline
+    let _border = egui::Color32::from_rgb(30, 41, 59);
 
-    let _border = border;
     painter.rect_filled(rect.shrink(1.0), 8.0, bg);
     painter.add(egui::Shape::line(
         ellipse_points(center, 10.3, 4.4, -30.0_f32.to_radians()),
@@ -1376,6 +2012,44 @@ fn draw_diff_rows(ui: &mut egui::Ui, rows: &[DiffRow]) {
     });
 }
 
+fn draw_code_diff_lines(ui: &mut egui::Ui, lines: &[crate::document::LineDiff]) {
+    egui::Grid::new("code_diff_grid").num_columns(4).spacing([8.0, 3.0]).striped(true).show(ui, |ui| {
+        ui.strong("Line");
+        ui.strong("Status");
+        ui.strong("Old");
+        ui.strong("New");
+        ui.end_row();
+
+        for line in lines {
+            if line.kind == LineDiffKind::Unchanged {
+                continue; // Only show changed lines
+            }
+            let (status_text, status_color, bg_color) = match line.kind {
+                LineDiffKind::Added => ("+ added", egui::Color32::from_rgb(180, 230, 190), egui::Color32::from_rgb(20, 64, 42)),
+                LineDiffKind::Removed => ("- removed", egui::Color32::from_rgb(245, 190, 190), egui::Color32::from_rgb(74, 34, 38)),
+                LineDiffKind::Modified => ("~ modified", egui::Color32::from_rgb(200, 200, 130), egui::Color32::from_rgb(60, 55, 20)),
+                LineDiffKind::Unchanged => continue,
+            };
+
+            ui.monospace(line.line_number.to_string());
+            ui.label(egui::RichText::new(status_text).monospace().small().color(status_color));
+            ui.label(
+                egui::RichText::new(&line.old_text)
+                    .monospace()
+                    .color(egui::Color32::from_rgb(245, 190, 190))
+                    .background_color(if line.kind == LineDiffKind::Removed { bg_color } else { egui::Color32::TRANSPARENT }),
+            );
+            ui.label(
+                egui::RichText::new(&line.new_text)
+                    .monospace()
+                    .color(egui::Color32::from_rgb(180, 230, 190))
+                    .background_color(if line.kind == LineDiffKind::Added { bg_color } else { egui::Color32::TRANSPARENT }),
+            );
+            ui.end_row();
+        }
+    });
+}
+
 fn diff_colors(kind: DiffKind) -> (egui::Color32, egui::Color32, egui::Color32) {
     match kind {
         DiffKind::Added => (
@@ -1412,6 +2086,32 @@ fn theme_name(theme: ThemeMode) -> &'static str {
         ThemeMode::System => "System",
         ThemeMode::Light => "Light",
         ThemeMode::Dark => "Dark",
+    }
+}
+
+/// Return a simple text-based icon hint for a file based on its extension.
+fn file_icon_hint(name: &str) -> &'static str {
+    let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    match ext.as_str() {
+        "rs" => "[rs]",
+        "c" | "h" => "[c]",
+        "cc" | "cpp" | "cxx" | "hpp" | "hxx" => "[c++]",
+        "zig" => "[zig]",
+        "py" => "[py]",
+        "js" | "mjs" => "[js]",
+        "ts" | "tsx" => "[ts]",
+        "html" | "htm" => "[html]",
+        "css" => "[css]",
+        "json" => "[json]",
+        "toml" => "[toml]",
+        "yaml" | "yml" => "[yaml]",
+        "md" | "markdown" => "[md]",
+        "sh" | "bash" => "[sh]",
+        "txt" => "[txt]",
+        "lock" => "[lock]",
+        "svg" => "[svg]",
+        "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp" => "[img]",
+        _ => "[ ]",
     }
 }
 

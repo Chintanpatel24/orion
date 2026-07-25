@@ -119,6 +119,91 @@ pub fn commit(root: &Path, message: &str) -> Result<(), String> {
     run_git(root, &["commit", "-m", trimmed]).map(|_| ())
 }
 
+/// Initialize a new git repository at the given path.
+pub fn init_repo(path: &Path) -> Result<(), String> {
+    run_git(path, &["init"]).map(|_| ())
+}
+
+/// Apply user.name and user.email to the local git config.
+pub fn apply_config(root: &Path, name: &str, email: &str) -> Result<(), String> {
+    let name = name.trim();
+    let email = email.trim();
+    if name.is_empty() {
+        return Err("Git user name cannot be empty".to_string());
+    }
+    if email.is_empty() {
+        return Err("Git user email cannot be empty".to_string());
+    }
+    run_git(root, &["config", "user.name", name])?;
+    run_git(root, &["config", "user.email", email])?;
+    Ok(())
+}
+
+/// Check if git is available on this system.
+#[allow(dead_code)]
+pub fn is_git_available() -> bool {
+    Command::new("git")
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok()
+}
+
+/// Get the remote URL of the repository, if any.
+#[allow(dead_code)]
+pub fn remote_url(root: &Path) -> Option<String> {
+    run_git(root, &["remote", "get-url", "origin"]).ok().map(|url| url.trim().to_string()).filter(|url| !url.is_empty())
+}
+
+/// Get a short log of recent commits (up to n).
+pub fn recent_log(root: &Path, count: usize) -> Result<Vec<String>, String> {
+    let count_str = format!("-{count}");
+    let output = run_git(root, &["log", "--oneline", &count_str])?;
+    Ok(output.lines().map(|line| line.to_string()).collect())
+}
+
+/// Stage all changed files.
+pub fn stage_all(root: &Path) -> Result<(), String> {
+    run_git(root, &["add", "-A"]).map(|_| ())
+}
+
+/// Get the count of commits on the current branch.
+#[allow(dead_code)]
+pub fn commit_count(root: &Path) -> Result<usize, String> {
+    let output = run_git(root, &["rev-list", "--count", "HEAD"])?;
+    output.trim().parse::<usize>().map_err(|err| format!("Cannot parse commit count: {err}"))
+}
+
+/// Create a new branch.
+pub fn create_branch(root: &Path, name: &str) -> Result<(), String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("Branch name is empty".to_string());
+    }
+    run_git(root, &["checkout", "-b", name]).map(|_| ())
+}
+
+/// Switch to an existing branch.
+pub fn switch_branch(root: &Path, name: &str) -> Result<(), String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("Branch name is empty".to_string());
+    }
+    run_git(root, &["checkout", name]).map(|_| ())
+}
+
+/// List all local branches.
+pub fn list_branches(root: &Path) -> Result<Vec<String>, String> {
+    let output = run_git(root, &["branch", "--list"])?;
+    Ok(output
+        .lines()
+        .map(|line| line.trim_start_matches(['*', ' ']).to_string())
+        .filter(|branch| !branch.is_empty())
+        .collect())
+}
+
 fn run_git(root: &Path, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")
         .arg("-C")
