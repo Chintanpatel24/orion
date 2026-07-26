@@ -1,6 +1,8 @@
-# Orion IDE
-
+<div aalign=center>
+  
 ![Orion IDE logo](assets/orion-logo.svg)
+
+</div>
 
 - Orion is a fast, lightweight, secure native desktop IDE for low-level languages and agent-driven code review.
 
