@@ -11,37 +11,53 @@ function Need-Command($Name, $Message) {
     }
 }
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$CandidateRoot = Resolve-Path (Join-Path $ScriptDir "..") -ErrorAction SilentlyContinue
-
-if ($CandidateRoot -and (Test-Path (Join-Path $CandidateRoot "Cargo.toml"))) {
-    $SourceDir = $CandidateRoot.Path
-} elseif (Test-Path ".\Cargo.toml") {
-    $SourceDir = (Resolve-Path ".").Path
-} else {
-    Need-Command git "Install git or download the Orion source archive manually."
-    if (Test-Path $CacheDir) { Remove-Item -Recurse -Force $CacheDir }
-    git clone --depth 1 $RepoUrl $CacheDir
-    $SourceDir = $CacheDir
-}
-
-Need-Command cargo "Install Rust from https://rustup.rs, then run this installer again."
-
-Push-Location $SourceDir
-try {
-    if (Test-Path "Cargo.lock") {
-        cargo build --profile $Profile --locked
-    } else {
-        cargo build --profile $Profile
-    }
-} finally {
-    Pop-Location
-}
-
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-$ExeSource = Join-Path $SourceDir "target\$Profile\orion.exe"
 $ExeDest = Join-Path $InstallDir "orion.exe"
-Copy-Item $ExeSource $ExeDest -Force
+$Downloaded = $false
+
+if (-not $env:ORION_FORCE_BUILD) {
+    $Url = "https://github.com/Chintanpatel24/orion/releases/latest/download/orion-windows-x86_64.exe"
+    Write-Host "Attempting to download pre-built binary..."
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $ExeDest -UseBasicParsing -ErrorAction Stop
+        $Downloaded = $true
+        Write-Host "Successfully installed pre-compiled binary!"
+    } catch {
+        Write-Host "Pre-built binary not found or download failed. Compiling from source..."
+    }
+}
+
+if (-not $Downloaded) {
+    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $CandidateRoot = Resolve-Path (Join-Path $ScriptDir "..") -ErrorAction SilentlyContinue
+
+    if ($CandidateRoot -and (Test-Path (Join-Path $CandidateRoot "Cargo.toml"))) {
+        $SourceDir = $CandidateRoot.Path
+    } elseif (Test-Path ".\Cargo.toml") {
+        $SourceDir = (Resolve-Path ".").Path
+    } else {
+        Need-Command git "Install git or download the Orion source archive manually."
+        if (Test-Path $CacheDir) { Remove-Item -Recurse -Force $CacheDir }
+        git clone --depth 1 $RepoUrl $CacheDir
+        $SourceDir = $CacheDir
+    }
+
+    Need-Command cargo "Install Rust from https://rustup.rs, then run this installer again."
+
+    Push-Location $SourceDir
+    try {
+        if (Test-Path "Cargo.lock") {
+            cargo build --profile $Profile --locked
+        } else {
+            cargo build --profile $Profile
+        }
+    } finally {
+        Pop-Location
+    }
+
+    $ExeSource = Join-Path $SourceDir "target\$Profile\orion.exe"
+    Copy-Item $ExeSource $ExeDest -Force
+}
 
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($null -eq $UserPath) { $UserPath = "" }

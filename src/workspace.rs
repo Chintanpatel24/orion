@@ -22,13 +22,7 @@ pub struct Workspace {
 
 impl Default for Workspace {
     fn default() -> Self {
-        Self {
-            root: None,
-            entries: Vec::new(),
-            max_depth: 12,
-            max_entries: 10_000,
-            collapsed_dirs: HashSet::new(),
-        }
+        Self { root: None, entries: Vec::new(), max_depth: 12, max_entries: 10_000, collapsed_dirs: HashSet::new() }
     }
 }
 

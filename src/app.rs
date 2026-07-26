@@ -2,7 +2,6 @@ use crate::command::{self, PaletteAction};
 use crate::document::{Document, LineDiffKind};
 use crate::git::{self, DiffKind, DiffRow, GitFile};
 use crate::settings::{Settings, ThemeMode};
-use crate::syntax;
 use crate::workspace::Workspace;
 use eframe::egui;
 use std::path::PathBuf;
@@ -27,6 +26,8 @@ pub struct OrionApp {
     workspace: Workspace,
     documents: Vec<Document>,
     current: usize,
+    current_right: Option<usize>,
+    active_pane: usize,
     next_doc_id: u64,
     show_palette: bool,
     palette_query: String,
@@ -45,11 +46,6 @@ pub struct OrionApp {
     commit_message: String,
     status: String,
     pending_close: Option<CloseRequest>,
-    show_terminal: bool,
-    terminal_input: String,
-    terminal_output: String,
-    terminal_running: bool,
-    terminal_receiver: Option<std::sync::mpsc::Receiver<String>>,
     // Git config form fields
     git_config_name: String,
     git_config_email: String,
@@ -72,9 +68,11 @@ impl OrionApp {
         let mut app = Self {
             settings,
             workspace: Workspace::default(),
-            documents: vec![Document::untitled(1)],
+            documents: Vec::new(),
             current: 0,
-            next_doc_id: 2,
+            current_right: None,
+            active_pane: 0,
+            next_doc_id: 1,
             show_palette: false,
             palette_query: String::new(),
             show_search: false,
@@ -92,11 +90,6 @@ impl OrionApp {
             commit_message: String::new(),
             status: "Ready. Orion is an IDE not for you, but for your agents.".to_string(),
             pending_close: None,
-            show_terminal: false,
-            terminal_input: String::new(),
-            terminal_output: String::new(),
-            terminal_running: false,
-            terminal_receiver: None,
             git_config_name: String::new(),
             git_config_email: String::new(),
             git_config_branch: String::new(),
@@ -249,8 +242,6 @@ impl OrionApp {
         }
         self.documents.remove(idx);
         if self.documents.is_empty() {
-            self.documents.push(Document::untitled(self.next_doc_id));
-            self.next_doc_id += 1;
             self.current = 0;
         } else {
             self.current = self.current.min(self.documents.len().saturating_sub(1));
@@ -504,7 +495,7 @@ impl OrionApp {
             self.refresh_git();
         }
         if terminal {
-            self.show_terminal = !self.show_terminal;
+            self.execute_external_terminal();
         }
         if clear_diff {
             self.clear_current_diff();
@@ -567,7 +558,7 @@ impl OrionApp {
             PaletteAction::Settings => self.show_settings = true,
             PaletteAction::Help => self.show_help = true,
             PaletteAction::Terminal => {
-                self.show_terminal = !self.show_terminal;
+                self.execute_external_terminal();
             }
         }
     }
@@ -619,22 +610,15 @@ impl OrionApp {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     // Code Diff button with change count indicator
                     let diff_count: usize = self.documents.iter().map(|doc| doc.diff_line_count()).sum();
-                    let diff_label = if diff_count > 0 {
-                        format!("Code Diff ({})", diff_count)
-                    } else {
-                        "Code Diff".to_string()
-                    };
+                    let diff_label =
+                        if diff_count > 0 { format!("Code Diff ({})", diff_count) } else { "Code Diff".to_string() };
                     if ui
                         .add(
-                            egui::Button::new(
-                                egui::RichText::new(diff_label)
-                                    .strong()
-                                    .color(if diff_count > 0 {
-                                        egui::Color32::from_rgb(255, 200, 100)
-                                    } else {
-                                        egui::Color32::from_rgb(216, 222, 233)
-                                    }),
-                            )
+                            egui::Button::new(egui::RichText::new(diff_label).strong().color(if diff_count > 0 {
+                                egui::Color32::from_rgb(255, 200, 100)
+                            } else {
+                                egui::Color32::from_rgb(216, 222, 233)
+                            }))
                             .fill(egui::Color32::from_rgb(42, 36, 20)),
                         )
                         .clicked()
@@ -744,7 +728,7 @@ impl OrionApp {
                         ui.close();
                     }
                     if ui.button("Terminal    Ctrl-T").clicked() {
-                        self.show_terminal = !self.show_terminal;
+                        self.execute_external_terminal();
                         ui.close();
                     }
                     if ui.button("Command palette    Ctrl-P").clicked() {
@@ -833,8 +817,7 @@ impl OrionApp {
                                 let collapsed = self.workspace.is_collapsed(&entry.path);
                                 let arrow = if collapsed { ">" } else { "v" };
                                 let label = format!("{} {}/", arrow, entry.name);
-                                let text =
-                                    egui::RichText::new(label).color(egui::Color32::from_rgb(142, 160, 184));
+                                let text = egui::RichText::new(label).color(egui::Color32::from_rgb(142, 160, 184));
                                 let response = ui.selectable_label(false, text);
                                 if response.clicked() {
                                     toggle_dir = Some(entry.path.clone());
@@ -843,10 +826,8 @@ impl OrionApp {
                                 // Show file icon hint based on extension
                                 let icon = file_icon_hint(&entry.name);
                                 let label = format!("{} {}", icon, entry.name);
-                                let is_open = self
-                                    .documents
-                                    .iter()
-                                    .any(|doc| doc.path.as_deref() == Some(entry.path.as_path()));
+                                let is_open =
+                                    self.documents.iter().any(|doc| doc.path.as_deref() == Some(entry.path.as_path()));
                                 let color = if is_open {
                                     egui::Color32::from_rgb(143, 179, 255)
                                 } else {
@@ -891,32 +872,66 @@ impl OrionApp {
 
     fn show_editor(&mut self, ui: &mut egui::Ui) {
         egui::CentralPanel::default().show(ui, |ui| {
+            if self.documents.is_empty() {
+                ui.centered_and_justified(|ui| {
+                    ui.vertical(|ui| {
+                        ui.heading("Orion IDE");
+                        ui.label("No file is currently open.");
+                        ui.add_space(20.0);
+                        if ui.button("Open Folder (Ctrl-Shift-O)").clicked() {
+                            self.pick_and_open_workspace();
+                        }
+                        if ui.button("New File (Ctrl-N)").clicked() {
+                            self.new_document();
+                        }
+                    });
+                });
+                return;
+            }
+
             self.show_tabs(ui);
             ui.separator();
 
-            let Some(doc) = self.documents.get(self.current) else {
-                return;
-            };
-            let highlight_limit = self.settings.highlight_limit_mb.saturating_mul(1024).saturating_mul(1024) as usize;
-            let language = if self.settings.syntax_highlighting
-                && !self.settings.low_power_mode
-                && doc.byte_count() <= highlight_limit
-            {
-                doc.language
+            if let Some(right_idx) = self.current_right {
+                if right_idx >= self.documents.len() {
+                    self.current_right = None;
+                }
+            }
+
+            if let Some(right_idx) = self.current_right {
+                ui.columns(2, |cols| {
+                    self.render_editor_pane(&mut cols[0], self.current);
+                    self.render_editor_pane(&mut cols[1], right_idx);
+                });
             } else {
-                syntax::Language::Plain
-            };
-            let font_size = self.settings.font_size;
+                self.render_editor_pane(ui, self.current);
+            }
+        });
+    }
 
-            let Some(doc) = self.documents.get_mut(self.current) else {
-                return;
-            };
+    fn render_editor_pane(&mut self, ui: &mut egui::Ui, doc_idx: usize) {
+        let highlight_limit = self.settings.highlight_limit_mb.saturating_mul(1024).saturating_mul(1024) as usize;
+        let font_size = self.settings.font_size;
 
-            let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, wrap_width: f32| {
-                let job = syntax::highlighted_job(ui, text.as_str(), language, wrap_width, font_size);
-                ui.fonts_mut(|fonts| fonts.layout_job(job))
-            };
+        let Some(doc) = self.documents.get_mut(doc_idx) else {
+            return;
+        };
 
+        let language = if self.settings.syntax_highlighting
+            && !self.settings.low_power_mode
+            && doc.byte_count() <= highlight_limit
+        {
+            doc.language
+        } else {
+            crate::syntax::Language::Plain
+        };
+
+        let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, wrap_width: f32| {
+            let job = crate::syntax::highlighted_job(ui, text.as_str(), language, wrap_width, font_size);
+            ui.fonts_mut(|fonts| fonts.layout_job(job))
+        };
+
+        ui.push_id(doc_idx, |ui| {
             egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| {
                 let response = ui.add(
                     egui::TextEdit::multiline(&mut doc.text)
@@ -938,9 +953,39 @@ impl OrionApp {
     fn show_tabs(&mut self, ui: &mut egui::Ui) {
         let mut close_idx = None;
         ui.horizontal_wrapped(|ui| {
+            // Split controls
+            if self.current_right.is_none() {
+                if ui.button("◫ Split").on_hover_text("Split editor right").clicked() {
+                    self.current_right = Some(self.current);
+                    self.active_pane = 1;
+                }
+            } else {
+                if ui.selectable_label(self.active_pane == 0, "Left Pane").clicked() {
+                    self.active_pane = 0;
+                }
+                if ui.selectable_label(self.active_pane == 1, "Right Pane").clicked() {
+                    self.active_pane = 1;
+                }
+                if ui.button("🗙 Close Split").clicked() {
+                    self.current_right = None;
+                    self.active_pane = 0;
+                }
+            }
+            ui.separator();
+
             for idx in 0..self.documents.len() {
                 let doc = &self.documents[idx];
-                let selected = idx == self.current && self.main_view == MainView::Editor;
+
+                let mut is_active_in_any = false;
+                if self.main_view == MainView::Editor {
+                    if self.active_pane == 0 && idx == self.current {
+                        is_active_in_any = true;
+                    }
+                    if self.active_pane == 1 && Some(idx) == self.current_right {
+                        is_active_in_any = true;
+                    }
+                }
+
                 let has_diff = doc.has_diff_changes();
 
                 let title_text = if has_diff {
@@ -949,8 +994,12 @@ impl OrionApp {
                     egui::RichText::new(doc.display_title())
                 };
 
-                if ui.selectable_label(selected, title_text).clicked() {
-                    self.current = idx;
+                if ui.selectable_label(is_active_in_any, title_text).clicked() {
+                    if self.active_pane == 0 {
+                        self.current = idx;
+                    } else {
+                        self.current_right = Some(idx);
+                    }
                     self.main_view = MainView::Editor;
                 }
                 if ui.small_button("x").on_hover_text("Close tab").clicked() {
@@ -1820,125 +1869,33 @@ impl OrionApp {
         });
     }
 
-    fn poll_terminal(&mut self) {
-        if let Some(rx) = &self.terminal_receiver {
-            if let Ok(output) = rx.try_recv() {
-                self.terminal_output.push_str(&output);
-                self.terminal_output.push_str("\n");
-                self.terminal_running = false;
-                self.terminal_receiver = None;
-            }
-        }
-    }
+    fn execute_external_terminal(&mut self) {
+        let root = self.workspace.root.clone().unwrap_or_else(|| PathBuf::from("."));
+        #[cfg(target_os = "windows")]
+        let _ = std::process::Command::new("cmd").arg("/c").arg("start").arg("cmd").current_dir(&root).spawn();
 
-    fn execute_terminal_command(&mut self) {
-        let command_str = self.terminal_input.trim().to_string();
-        if command_str.is_empty() {
-            return;
-        }
-        self.terminal_output.push_str(&format!("$ {}\n", command_str));
-        self.terminal_input.clear();
-        self.terminal_running = true;
+        #[cfg(target_os = "linux")]
+        let _ = std::process::Command::new("x-terminal-emulator")
+            .current_dir(&root)
+            .spawn()
+            .or_else(|_| std::process::Command::new("gnome-terminal").current_dir(&root).spawn())
+            .or_else(|_| std::process::Command::new("konsole").current_dir(&root).spawn());
 
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.terminal_receiver = Some(rx);
+        #[cfg(target_os = "macos")]
+        let _ = std::process::Command::new("open").arg("-a").arg("Terminal").arg(&root).spawn();
 
-        let workspace_root = self.workspace.root.clone();
-
-        std::thread::spawn(move || {
-            let mut cmd = if cfg!(target_os = "windows") {
-                let mut c = std::process::Command::new("cmd");
-                c.args(["/C", &command_str]);
-                c
-            } else {
-                let mut c = std::process::Command::new("sh");
-                c.args(["-c", &command_str]);
-                c
-            };
-
-            if let Some(root) = workspace_root {
-                cmd.current_dir(root);
-            }
-
-            match cmd.output() {
-                Ok(output) => {
-                    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                    let _ = tx.send(format!("{}{}", stdout, stderr));
-                }
-                Err(err) => {
-                    let _ = tx.send(format!("Error executing command: {}\n", err));
-                }
-            }
-        });
-    }
-
-    fn show_terminal_panel(&mut self, ui: &mut egui::Ui) {
-        if !self.show_terminal {
-            return;
-        }
-
-        egui::Panel::bottom("terminal_panel").resizable(true).default_size(180.0).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Terminal").strong().color(egui::Color32::from_rgb(226, 237, 248)));
-                if self.terminal_running {
-                    ui.spinner();
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Clear").clicked() {
-                        self.terminal_output.clear();
-                    }
-                    if ui.button("Close").clicked() {
-                        self.show_terminal = false;
-                    }
-                });
-            });
-            ui.add_space(4.0);
-            ui.separator();
-            ui.add_space(4.0);
-
-            // Scrollable terminal output history
-            egui::ScrollArea::vertical().max_height(120.0).auto_shrink([false, false]).show(ui, |ui| {
-                ui.add(
-                    egui::TextEdit::multiline(&mut self.terminal_output)
-                        .font(egui::TextStyle::Monospace)
-                        .desired_width(f32::INFINITY)
-                        .interactive(false),
-                );
-            });
-
-            ui.add_space(4.0);
-            ui.separator();
-            ui.add_space(4.0);
-
-            // Interactive command input
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("$").strong().color(egui::Color32::from_rgb(99, 137, 255)));
-                let response = ui.add(
-                    egui::TextEdit::singleline(&mut self.terminal_input)
-                        .hint_text("Enter terminal command (e.g. ls, cargo build)")
-                        .desired_width(f32::INFINITY),
-                );
-
-                if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    self.execute_terminal_command();
-                    response.request_focus(); // keep focus on terminal input!
-                }
-            });
-        });
+        self.status = "Opened external system terminal".to_string();
     }
 }
 
 impl eframe::App for OrionApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        self.poll_terminal();
         let ctx = ui.ctx().clone();
         self.handle_shortcuts(&ctx);
         self.show_top_bar(ui);
         self.show_status_bar(ui);
         self.show_workspace_panel(ui);
         self.show_main_area(ui);
-        self.show_terminal_panel(ui);
         self.show_palette_window(&ctx);
         self.show_search_window(&ctx);
         self.show_settings_window(&ctx);
@@ -2025,9 +1982,15 @@ fn draw_code_diff_lines(ui: &mut egui::Ui, lines: &[crate::document::LineDiff]) 
                 continue; // Only show changed lines
             }
             let (status_text, status_color, bg_color) = match line.kind {
-                LineDiffKind::Added => ("+ added", egui::Color32::from_rgb(180, 230, 190), egui::Color32::from_rgb(20, 64, 42)),
-                LineDiffKind::Removed => ("- removed", egui::Color32::from_rgb(245, 190, 190), egui::Color32::from_rgb(74, 34, 38)),
-                LineDiffKind::Modified => ("~ modified", egui::Color32::from_rgb(200, 200, 130), egui::Color32::from_rgb(60, 55, 20)),
+                LineDiffKind::Added => {
+                    ("+ added", egui::Color32::from_rgb(180, 230, 190), egui::Color32::from_rgb(20, 64, 42))
+                }
+                LineDiffKind::Removed => {
+                    ("- removed", egui::Color32::from_rgb(245, 190, 190), egui::Color32::from_rgb(74, 34, 38))
+                }
+                LineDiffKind::Modified => {
+                    ("~ modified", egui::Color32::from_rgb(200, 200, 130), egui::Color32::from_rgb(60, 55, 20))
+                }
                 LineDiffKind::Unchanged => continue,
             };
 
@@ -2037,13 +2000,21 @@ fn draw_code_diff_lines(ui: &mut egui::Ui, lines: &[crate::document::LineDiff]) 
                 egui::RichText::new(&line.old_text)
                     .monospace()
                     .color(egui::Color32::from_rgb(245, 190, 190))
-                    .background_color(if line.kind == LineDiffKind::Removed { bg_color } else { egui::Color32::TRANSPARENT }),
+                    .background_color(if line.kind == LineDiffKind::Removed {
+                        bg_color
+                    } else {
+                        egui::Color32::TRANSPARENT
+                    }),
             );
             ui.label(
                 egui::RichText::new(&line.new_text)
                     .monospace()
                     .color(egui::Color32::from_rgb(180, 230, 190))
-                    .background_color(if line.kind == LineDiffKind::Added { bg_color } else { egui::Color32::TRANSPARENT }),
+                    .background_color(if line.kind == LineDiffKind::Added {
+                        bg_color
+                    } else {
+                        egui::Color32::TRANSPARENT
+                    }),
             );
             ui.end_row();
         }

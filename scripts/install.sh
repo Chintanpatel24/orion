@@ -15,41 +15,83 @@ need() {
   fi
 }
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || pwd)
-
-if [ -f "$SCRIPT_DIR/../Cargo.toml" ]; then
-  SRC_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-elif [ -f "./Cargo.toml" ]; then
-  SRC_DIR=$(pwd)
-else
-  need git "Install git or download the Orion source archive manually."
-  rm -rf "$CACHE_DIR"
-  mkdir -p "$(dirname "$CACHE_DIR")"
-  git clone --depth 1 "$REPO_URL" "$CACHE_DIR"
-  SRC_DIR="$CACHE_DIR"
-fi
-
-need cargo "Install Rust from https://rustup.rs, then run this installer again."
-
-cd "$SRC_DIR"
-if [ -f Cargo.lock ]; then
-  cargo build --profile "$PROFILE" --locked
-else
-  cargo build --profile "$PROFILE"
-fi
-
 mkdir -p "$BINDIR"
-cp "target/$PROFILE/orion" "$BINDIR/orion"
-chmod +x "$BINDIR/orion"
 
+# Try downloading pre-built binary
 OS=$(uname -s 2>/dev/null || echo unknown)
+ARCH=$(uname -m 2>/dev/null || echo unknown)
+DOWNLOADED=false
+
+if [ -z "${ORION_FORCE_BUILD:-}" ]; then
+  if [ "$OS" = "Linux" ] && [ "$ARCH" = "x86_64" ]; then
+    URL="https://github.com/Chintanpatel24/orion/releases/latest/download/orion-linux-x86_64"
+    echo "Attempting to download pre-built binary for Linux x86_64..."
+    if command -v curl >/dev/null; then
+      if curl -sLf "$URL" -o "$BINDIR/orion"; then
+        DOWNLOADED=true
+      fi
+    elif command -v wget >/dev/null; then
+      if wget -qO "$BINDIR/orion" "$URL"; then
+        DOWNLOADED=true
+      fi
+    fi
+  elif [ "$OS" = "Darwin" ] && [ "$ARCH" = "x86_64" ]; then
+    URL="https://github.com/Chintanpatel24/orion/releases/latest/download/orion-macos-x86_64"
+    echo "Attempting to download pre-built binary for macOS x86_64..."
+    if command -v curl >/dev/null; then
+      if curl -sLf "$URL" -o "$BINDIR/orion"; then
+        DOWNLOADED=true
+      fi
+    fi
+  fi
+fi
+
+if [ "$DOWNLOADED" = "true" ]; then
+  chmod +x "$BINDIR/orion"
+  echo "Successfully installed pre-compiled binary!"
+else
+  echo "Pre-built binary not found or downloaded. Compiling from source..."
+  
+  SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || pwd)
+
+  if [ -f "$SCRIPT_DIR/../Cargo.toml" ]; then
+    SRC_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+  elif [ -f "./Cargo.toml" ]; then
+    SRC_DIR=$(pwd)
+  else
+    need git "Install git or download the Orion source archive manually."
+    rm -rf "$CACHE_DIR"
+    mkdir -p "$(dirname "$CACHE_DIR")"
+    git clone --depth 1 "$REPO_URL" "$CACHE_DIR"
+    SRC_DIR="$CACHE_DIR"
+  fi
+
+  need cargo "Install Rust from https://rustup.rs, then run this installer again."
+
+  cd "$SRC_DIR"
+  if [ -f Cargo.lock ]; then
+    cargo build --profile "$PROFILE" --locked
+  else
+    cargo build --profile "$PROFILE"
+  fi
+
+  cp "target/$PROFILE/orion" "$BINDIR/orion"
+  chmod +x "$BINDIR/orion"
+fi
+
 if [ "$OS" = "Linux" ]; then
   APP_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/applications
   ICON_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps
   mkdir -p "$APP_DIR" "$ICON_DIR"
-  if [ -f "$SRC_DIR/assets/dev.orion.Orion.svg" ]; then
-    cp "$SRC_DIR/assets/dev.orion.Orion.svg" "$ICON_DIR/dev.orion.Orion.svg"
+  
+  # Try to find icon
+  SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || pwd)
+  if [ -f "$SCRIPT_DIR/../assets/dev.orion.Orion.svg" ]; then
+    cp "$SCRIPT_DIR/../assets/dev.orion.Orion.svg" "$ICON_DIR/dev.orion.Orion.svg"
+  elif [ -f "$SCRIPT_DIR/assets/dev.orion.Orion.svg" ]; then
+    cp "$SCRIPT_DIR/assets/dev.orion.Orion.svg" "$ICON_DIR/dev.orion.Orion.svg"
   fi
+  
   cat > "$APP_DIR/orion.desktop" <<EOF_DESKTOP
 [Desktop Entry]
 Type=Application
