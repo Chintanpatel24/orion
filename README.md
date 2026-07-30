@@ -14,6 +14,8 @@ IDE not for you, but for your agents.
 
 - Orion is designed for people who want a clean desktop app like modern IDEs, but without Electron, Chromium, a webview runtime, telemetry, heavy background services, or a built-in code runner output window. The main workflow is editing plus Git review, so agents and users can inspect changes quickly, mark files done, and keep moving.
 
+<img width="1323" height="767" alt="orion" src="https://github.com/user-attachments/assets/82f021f3-06a2-42bb-a0e2-b85be9f1fa2a" />
+
 ## Status
 
 - Orion is a GitHub-ready repository with source code, assets, installers, packaging templates, CI workflows, documentation, security notes, and contribution files.
